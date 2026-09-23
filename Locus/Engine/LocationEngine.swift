@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import idevice
 
 enum LocationEngineError: LocalizedError {
@@ -55,6 +56,13 @@ enum LocationEngine {
     private static let simulationCreate: Int32 = 10
     private static let locationSet: Int32 = 11
     private static let locationClear: Int32 = 12
+    private static let fallbackRemotePairingPort: UInt16 = 49152
+    private static var _lastRemotePairingPort: UInt16?
+
+    /// Most recently discovered/used _remotepairing._tcp port.
+    static var lastRemotePairingPort: UInt16? {
+        queue.sync { _lastRemotePairingPort }
+    }
 
     static var isSessionActive: Bool { locationSimulation != nil }
 
@@ -105,9 +113,13 @@ enum LocationEngine {
             }
         }
 
+        let remotePairingPort = discoverRemotePairingPort(timeout: 2.5) ?? fallbackRemotePairingPort
+        _lastRemotePairingPort = remotePairingPort
+        NSLog("[Locus] Remote Pairing port: %u", remotePairingPort)
+
         var address = sockaddr_in()
         address.sin_family = sa_family_t(AF_INET)
-        address.sin_port = in_port_t(54229).bigEndian
+        address.sin_port = in_port_t(remotePairingPort).bigEndian
         let inetResult = deviceIP.withCString { inet_pton(AF_INET, $0, &address.sin_addr) }
         guard inetResult == 1 else { return invalidIP }
 
@@ -159,6 +171,65 @@ enum LocationEngine {
             return locationSet
         }
         return ok
+    }
+
+    /// Resolve the current Bonjour Remote Pairing service instead of assuming
+    /// Apple's historical 49152 port. LocalDevVPN exposes the device through
+    /// 10.7.0.1 while Bonjour advertises the actual, potentially dynamic port.
+    private static func discoverRemotePairingPort(timeout: TimeInterval) -> UInt16? {
+        let browser = NWBrowser(
+            for: .bonjour(type: "_remotepairing._tcp", domain: "local."),
+            using: .tcp
+        )
+        let browserQueue = DispatchQueue(label: "com.chrismack.locus.remotepairing")
+        let semaphore = DispatchSemaphore(value: 0)
+        let lock = NSLock()
+        var resolvedPort: UInt16?
+        var finished = false
+
+        func finish(_ port: UInt16?) {
+            lock.lock()
+            defer { lock.unlock() }
+            guard !finished else { return }
+            if let port { resolvedPort = port }
+            finished = true
+            semaphore.signal()
+        }
+
+        browser.stateUpdateHandler = { state in
+            if case .failed = state { finish(nil) }
+        }
+        browser.browseResultsChangedHandler = { results, _ in
+            for result in results {
+                if case let .service(name: _, type: _, domain: _, interface: _) = result.endpoint {
+                    let connection = NWConnection(to: result.endpoint, using: .tcp)
+                    connection.stateUpdateHandler = { state in
+                        switch state {
+                        case .ready:
+                            if let path = connection.currentPath,
+                               case let .hostPort(_, port) = path.remoteEndpoint {
+                                let value = port.rawValue
+                                connection.cancel()
+                                finish(value)
+                            }
+                        case .failed:
+                            connection.cancel()
+                        default:
+                            break
+                        }
+                    }
+                    connection.start(queue: browserQueue)
+                }
+            }
+        }
+
+        browser.start(queue: browserQueue)
+        _ = semaphore.wait(timeout: .now() + timeout)
+        browser.cancel()
+
+        lock.lock()
+        defer { lock.unlock() }
+        return resolvedPort
     }
 
     private static func clearLocked() -> Int32 {
