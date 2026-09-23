@@ -26,6 +26,7 @@ struct LocusApp: App {
             }
             .environmentObject(session)
             .environmentObject(pairing)
+            .environment(\.locale, AppLanguage(rawValue: languageRawValue)?.locale ?? .autoupdatingCurrent)
             .preferredColorScheme(.dark)
             .onOpenURL { url in
                 handleIncoming(url)
