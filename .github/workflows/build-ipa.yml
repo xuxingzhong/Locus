@@ -1,0 +1,55 @@
+name: Build IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "Locus/**"
+      - "Vendor/**"
+      - "Locus.xcodeproj/**"
+      - "project.yml"
+      - ".github/workflows/build-ipa.yml"
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build unsigned app
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Locus.xcodeproj \
+            -scheme Locus \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/LocusDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          APP_PATH="$RUNNER_TEMP/LocusDerivedData/Build/Products/Release-iphoneos/Locus.app"
+          test -d "$APP_PATH"
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$APP_PATH" "$RUNNER_TEMP/ipa/Payload/Locus.app"
+          cd "$RUNNER_TEMP/ipa"
+          /usr/bin/zip -qry "$GITHUB_WORKSPACE/Locus-unsigned.ipa" Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Locus-unsigned
+          path: Locus-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
