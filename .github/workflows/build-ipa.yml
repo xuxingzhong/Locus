@@ -25,6 +25,12 @@ jobs:
         with:
           xcode-version: '26.0'
 
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
       - name: Show Xcode version
         run: |
           xcodebuild -version
