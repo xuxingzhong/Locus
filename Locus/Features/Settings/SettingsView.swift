@@ -28,6 +28,16 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section("Language") {
+                    Picker("Language", selection: $languageRawValue) {
+                        ForEach(AppLanguage.allCases) { language in
+                            Text(language.displayName)
+                                .tag(language.rawValue)
+                        }
+                    }
+                    .pickerStyle(.navigationLink)
+                }
+
                 Section {
                     Label {
                         Text(pairing.hasPairingFile ? "RPPairing file installed" : "No pairing file")
