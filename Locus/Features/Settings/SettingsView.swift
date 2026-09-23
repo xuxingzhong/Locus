@@ -11,7 +11,8 @@ struct SettingsView: View {
     @State private var showNameEasterEgg = false
     @State private var tunnelIP = TunnelConfig.targetIP
     @State private var localDevVPNInstalled = LocalDevVPN.isInstalled
-    @Environment(\.scenePhase) private var scenePhase\n    @AppStorage(AppLanguage.defaultsKey) private var languageRawValue = AppLanguage.system.rawValue
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(AppLanguage.defaultsKey) private var languageRawValue = AppLanguage.system.rawValue
 
     private var supportsOnDevicePairing: Bool {
         if #available(iOS 27.0, *) { return true }
