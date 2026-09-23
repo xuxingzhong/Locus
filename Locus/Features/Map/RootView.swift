@@ -32,7 +32,7 @@ struct RootView: View {
         )) {
             Button("OK", role: .cancel) { session.lastError = nil }
         } message: {
-            Text(session.lastError ?? "")
+            Text(LocalizedStringKey(session.lastError ?? ""))
         }
     }
 }
