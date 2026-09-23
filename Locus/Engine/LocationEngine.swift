@@ -131,24 +131,43 @@ enum LocationEngine {
         guard let pairingHandle else { return pairingRead }
         defer { rp_pairing_file_free(pairingHandle) }
 
-        let providerError = withUnsafePointer(to: &address) { pointer in
-            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                tunnel_create_rppairing(
-                    $0,
-                    socklen_t(MemoryLayout<sockaddr_in>.stride),
-                    "LocusLocation",
-                    pairingHandle,
-                    nil,
-                    nil,
-                    &adapter,
-                    &handshake
-                )
+        func createTunnel() -> OpaquePointer? {
+            withUnsafePointer(to: &address) { pointer in
+                pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    tunnel_create_rppairing(
+                        $0,
+                        socklen_t(MemoryLayout<sockaddr_in>.stride),
+                        "LocusLocation",
+                        pairingHandle,
+                        nil,
+                        nil,
+                        &adapter,
+                        &handshake
+                    )
+                }
             }
         }
-        if let providerError {
-            idevice_error_free(providerError)
+
+        if let firstError = createTunnel() {
+            idevice_error_free(firstError)
             cleanup()
-            return tunnelCreate
+            NSLog("[Locus] Initial developer tunnel attempt failed; retrying once after 600 ms")
+
+            Thread.sleep(forTimeInterval: 0.6)
+
+            // Bonjour/Remote Pairing may still be warming up on the first attempt.
+            // Re-discover because the advertised port can change while the service starts.
+            if let retryPort = discoverRemotePairingPort(timeout: 2.5) {
+                _lastRemotePairingPort = retryPort
+                address.sin_port = in_port_t(retryPort).bigEndian
+                NSLog("[Locus] Retry Remote Pairing port: %u", retryPort)
+            }
+
+            if let retryError = createTunnel() {
+                idevice_error_free(retryError)
+                cleanup()
+                return tunnelCreate
+            }
         }
 
         if let remoteServerError = remote_server_connect_rsd(adapter, handshake, &remoteServer) {
