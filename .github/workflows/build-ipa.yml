@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - "Locus/**"
+      - "Locus/**"\n      - ".github/workflows/build-ipa.yml"
       - "Vendor/**"
       - "Locus.xcodeproj/**"
       - "project.yml"
