@@ -131,7 +131,7 @@ enum LocationEngine {
         guard let pairingHandle else { return pairingRead }
         defer { rp_pairing_file_free(pairingHandle) }
 
-        func createTunnel() -> OpaquePointer? {
+        func createTunnel() -> UnsafeMutablePointer<IdeviceFfiError>? {
             withUnsafePointer(to: &address) { pointer in
                 pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
                     tunnel_create_rppairing(
