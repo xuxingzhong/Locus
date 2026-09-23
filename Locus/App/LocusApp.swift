@@ -4,7 +4,8 @@ import SwiftUI
 struct LocusApp: App {
     @StateObject private var session = SpoofSession()
     @StateObject private var pairing = PairingStore()
-    @AppStorage(SetupGate.defaultsKey) private var setupComplete = false\n    @AppStorage(AppLanguage.defaultsKey) private var languageRawValue = AppLanguage.system.rawValue
+    @AppStorage(SetupGate.defaultsKey) private var setupComplete = false
+    @AppStorage(AppLanguage.defaultsKey) private var languageRawValue = AppLanguage.system.rawValue
 
     /// Map when setup finished, or when already paired outside this walkthrough.
     private var showMap: Bool {
