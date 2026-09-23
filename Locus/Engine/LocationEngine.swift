@@ -107,7 +107,7 @@ enum LocationEngine {
 
         var address = sockaddr_in()
         address.sin_family = sa_family_t(AF_INET)
-        address.sin_port = in_port_t(49152).bigEndian
+        address.sin_port = in_port_t(54229).bigEndian
         let inetResult = deviceIP.withCString { inet_pton(AF_INET, $0, &address.sin_addr) }
         guard inetResult == 1 else { return invalidIP }
 
