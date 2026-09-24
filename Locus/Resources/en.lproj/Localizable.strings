@@ -122,3 +122,7 @@
 "Failed to clear simulated location." = "Failed to clear simulated location.";
 "No active simulation session." = "No active simulation session.";
 "Locus spoof dropped" = "Locus spoof dropped";
+
+"Restoring…" = "Restoring…";
+"Location Restored" = "Location Restored";
+"Restore Failed" = "Restore Failed";
