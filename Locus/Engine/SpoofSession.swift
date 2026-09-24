@@ -125,7 +125,10 @@ final class SpoofSession: ObservableObject {
         stopResend()
         stopHealth()
         isBusy = true
-        let result = LocationEngine.clear()
+        let result = LocationEngine.clear(
+            pairingPath: pairing.pairingPath,
+            deviceIP: TunnelConfig.targetIP
+        )
         isBusy = false
         switch result {
         case .success:
