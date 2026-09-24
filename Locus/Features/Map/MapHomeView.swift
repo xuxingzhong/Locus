@@ -122,6 +122,18 @@ struct MapHomeView: View {
         .onChange(of: session.pin?.latitude) { _, newValue in
             if newValue == nil { pinSelected = false }
         }
+        .onChange(of: session.mapFocusRequest) { _, request in
+            guard let request else { return }
+            pinSelected = true
+            searchFocused = false
+            withAnimation(.easeInOut(duration: 0.35)) {
+                position = .region(MKCoordinateRegion(
+                    center: request.coordinate,
+                    latitudinalMeters: 900,
+                    longitudinalMeters: 900
+                ))
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .locusImportGPX)) { note in
             guard let url = note.object as? URL else { return }
             importGPX(url)
