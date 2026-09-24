@@ -126,3 +126,27 @@
 "RPPairing file saved. Connect LocalDevVPN, then teleport." = "RPPairing 文件已保存。连接 LocalDevVPN 后即可修改定位。";
 "Import an RPPairing file in Settings first." = "请先在设置中导入 RPPairing 文件。";
 "Drop a pin or teleport somewhere before using the joystick." = "使用摇杆前，请先放置定位点或修改一次定位。";
+
+"Real Location" = "真实定位";
+"Restore Location" = "恢复真实定位";
+"Connect LocalDevVPN before teleporting." = "修改定位前请先连接 LocalDevVPN。";
+"Connection Diagnostics" = "连接诊断";
+"RPPairing" = "RPPairing";
+"Ready" = "正常";
+"Missing" = "缺失";
+"LocalDevVPN" = "LocalDevVPN";
+"Tunnel IP" = "隧道 IP";
+"Developer Tunnel" = "开发者隧道";
+"Active" = "已建立";
+"Inactive" = "未建立";
+"Checking…" = "正在检测…";
+"Run Diagnostics" = "重新检测";
+"Tunnel IP is invalid. Check Settings → Tunnel IP (usually 10.7.0.1)." = "隧道 IP 无效，请检查设置中的隧道 IP（通常为 10.7.0.1）。";
+"Could not read the RPPairing file. Generate one with idevice_pair in RPPairing mode." = "无法读取 RPPairing 文件，请使用 idevice_pair 的 RPPairing 模式重新生成。";
+"Could not open the developer tunnel. Is LocalDevVPN connected on Wi‑Fi?" = "无法建立开发者隧道，请确认 LocalDevVPN 已连接并优先在 Wi‑Fi 下首次连接。";
+"Connected to the tunnel but RemoteXPC handshake failed." = "已连接隧道，但 RemoteXPC 握手失败。";
+"Could not open Apple’s location simulation service." = "无法打开 Apple 定位模拟服务。";
+"Failed to set simulated coordinates." = "设置模拟坐标失败。";
+"Failed to clear simulated location." = "恢复真实定位失败。";
+"No active simulation session." = "当前没有正在运行的定位模拟会话。";
+"Locus spoof dropped" = "Locus 模拟定位已中断";
