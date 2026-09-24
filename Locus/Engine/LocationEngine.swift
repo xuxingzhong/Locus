@@ -113,16 +113,6 @@ enum LocationEngine {
             }
         }
 
-        let remotePairingPort = discoverRemotePairingPort(timeout: 2.5) ?? fallbackRemotePairingPort
-        _lastRemotePairingPort = remotePairingPort
-        NSLog("[Locus] Remote Pairing port: %u", remotePairingPort)
-
-        var address = sockaddr_in()
-        address.sin_family = sa_family_t(AF_INET)
-        address.sin_port = in_port_t(remotePairingPort).bigEndian
-        let inetResult = deviceIP.withCString { inet_pton(AF_INET, $0, &address.sin_addr) }
-        guard inetResult == 1 else { return invalidIP }
-
         var pairingHandle: OpaquePointer?
         if let pairingError = pairingPath.withCString({ rp_pairing_file_read($0, &pairingHandle) }) {
             idevice_error_free(pairingError)
@@ -131,8 +121,22 @@ enum LocationEngine {
         guard let pairingHandle else { return pairingRead }
         defer { rp_pairing_file_free(pairingHandle) }
 
-        func createTunnel() -> UnsafeMutablePointer<IdeviceFfiError>? {
-            withUnsafePointer(to: &address) { pointer in
+        func connectAndSet(discoveryTimeout: TimeInterval) -> Int32 {
+            cleanup()
+
+            // Prefer the live Bonjour port. Only use the historical port after
+            // discovery has had a chance to finish.
+            let remotePairingPort = discoverRemotePairingPort(timeout: discoveryTimeout) ?? fallbackRemotePairingPort
+            _lastRemotePairingPort = remotePairingPort
+            NSLog("[Locus] Remote Pairing port: %u", remotePairingPort)
+
+            var address = sockaddr_in()
+            address.sin_family = sa_family_t(AF_INET)
+            address.sin_port = in_port_t(remotePairingPort).bigEndian
+            let inetResult = deviceIP.withCString { inet_pton(AF_INET, $0, &address.sin_addr) }
+            guard inetResult == 1 else { return invalidIP }
+
+            let tunnelError = withUnsafePointer(to: &address) { pointer in
                 pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
                     tunnel_create_rppairing(
                         $0,
@@ -146,50 +150,43 @@ enum LocationEngine {
                     )
                 }
             }
-        }
-
-        if let firstError = createTunnel() {
-            idevice_error_free(firstError)
-            cleanup()
-            NSLog("[Locus] Initial developer tunnel attempt failed; retrying once after 600 ms")
-
-            Thread.sleep(forTimeInterval: 0.6)
-
-            // Bonjour/Remote Pairing may still be warming up on the first attempt.
-            // Re-discover because the advertised port can change while the service starts.
-            if let retryPort = discoverRemotePairingPort(timeout: 2.5) {
-                _lastRemotePairingPort = retryPort
-                address.sin_port = in_port_t(retryPort).bigEndian
-                NSLog("[Locus] Retry Remote Pairing port: %u", retryPort)
-            }
-
-            if let retryError = createTunnel() {
-                idevice_error_free(retryError)
+            if let tunnelError {
+                idevice_error_free(tunnelError)
                 cleanup()
                 return tunnelCreate
             }
+
+            if let remoteServerError = remote_server_connect_rsd(adapter, handshake, &remoteServer) {
+                idevice_error_free(remoteServerError)
+                cleanup()
+                return remoteServerCode
+            }
+
+            if let simError = location_simulation_new(remoteServer, &locationSimulation) {
+                idevice_error_free(simError)
+                cleanup()
+                return simulationCreate
+            }
+            remoteServer = nil
+
+            if let setError = location_simulation_set(locationSimulation, latitude, longitude) {
+                idevice_error_free(setError)
+                cleanup()
+                return locationSet
+            }
+            return ok
         }
 
-        if let remoteServerError = remote_server_connect_rsd(adapter, handshake, &remoteServer) {
-            idevice_error_free(remoteServerError)
-            cleanup()
-            return remoteServerCode
-        }
+        let firstCode = connectAndSet(discoveryTimeout: 2.5)
+        guard firstCode != ok else { return ok }
+        guard firstCode != invalidIP && firstCode != pairingRead else { return firstCode }
 
-        if let simError = location_simulation_new(remoteServer, &locationSimulation) {
-            idevice_error_free(simError)
-            cleanup()
-            return simulationCreate
-        }
-        // location_simulation_new consumes/owns remote server lifecycle alongside handle
-        remoteServer = nil
-
-        if let setError = location_simulation_set(locationSimulation, latitude, longitude) {
-            idevice_error_free(setError)
-            cleanup()
-            return locationSet
-        }
-        return ok
+        // The Remote Pairing advertisement/tunnel can still be warming up on
+        // the first teleport. Retry the complete connection chain rather than
+        // only recreating the tunnel.
+        NSLog("[Locus] Initial location session failed with code %d; retrying full session", firstCode)
+        Thread.sleep(forTimeInterval: 1.0)
+        return connectAndSet(discoveryTimeout: 3.5)
     }
 
     /// Resolve the current Bonjour Remote Pairing service instead of assuming
