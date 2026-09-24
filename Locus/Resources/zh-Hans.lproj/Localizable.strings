@@ -150,3 +150,7 @@
 "Failed to clear simulated location." = "恢复真实定位失败。";
 "No active simulation session." = "当前没有正在运行的定位模拟会话。";
 "Locus spoof dropped" = "Locus 模拟定位已中断";
+
+"Restoring…" = "正在恢复真实定位…";
+"Location Restored" = "已恢复真实定位";
+"Restore Failed" = "恢复真实定位失败";
