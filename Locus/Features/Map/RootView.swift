@@ -59,6 +59,12 @@ struct StatusBarView: View {
             return .status("Spoofing")
         case .reconnecting:
             return .status("Reconnecting…")
+        case .restoring:
+            return .status("Restoring…")
+        case .restored:
+            return .status("Location Restored")
+        case .restoreFailed:
+            return .status("Restore Failed")
         case .dropped(let reason):
             return .status(reason.isEmpty ? "Disconnected" : "Disconnected — \(reason)")
         }
@@ -73,8 +79,9 @@ struct StatusBarView: View {
         case .status:
             switch session.status {
             case .active: return LocusTheme.statusGood
-            case .connecting, .reconnecting: return LocusTheme.statusWarn
-            case .dropped: return LocusTheme.statusBad
+            case .connecting, .reconnecting, .restoring: return LocusTheme.statusWarn
+            case .restored: return LocusTheme.statusGood
+            case .restoreFailed, .dropped: return LocusTheme.statusBad
             case .idle: return Color.primary.opacity(0.55)
             }
         }
@@ -224,7 +231,14 @@ struct BottomControlsView: View {
                     Button {
                         session.stop(pairing: pairing)
                     } label: {
-                        Text("Restore Location")
+                        HStack(spacing: 6) {
+                            if session.status == .restoring {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(.white)
+                            }
+                            Text(session.status == .restoring ? "Restoring…" : "Restore Location")
+                        }
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(.white)
                             .frame(minWidth: 72)
@@ -234,6 +248,7 @@ struct BottomControlsView: View {
                             .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
+                    .disabled(session.status == .restoring)
                 } else {
                     Button {
                         guard let pin = session.pin else {
