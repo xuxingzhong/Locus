@@ -43,7 +43,7 @@ struct SettingsView: View {
 
                 Section {
                     Label {
-                        Text(pairing.hasPairingFile ? "RPPairing file installed" : "No pairing file")
+                        Text(LocalizedStringKey(pairing.hasPairingFile ? "RPPairing file installed" : "No pairing file"))
                     } icon: {
                         Image(systemName: pairing.hasPairingFile ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                             .foregroundStyle(pairing.hasPairingFile ? LocusTheme.statusGood : LocusTheme.statusWarn)
@@ -86,7 +86,7 @@ struct SettingsView: View {
                             TunnelConfig.setTargetIP(tunnelIP)
                         }
                     LabeledContent("Status") {
-                        Text(LocalDevVPN.isConnected ? "Connected" : "Not connected")
+                        Text(LocalizedStringKey(LocalDevVPN.isConnected ? "Connected" : "Not connected"))
                             .foregroundStyle(LocalDevVPN.isConnected ? LocusTheme.statusGood : LocusTheme.statusWarn)
                     }
                     LabeledContent("Remote Pairing Port") {
