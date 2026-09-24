@@ -297,9 +297,19 @@ final class SpoofSession: ObservableObject {
             status = .connecting
         }
         isBusy = true
+        let injectionCoordinate = ChinaCoordinateTransform.injectionCoordinate(from: coordinate)
+        if ChinaCoordinateTransform.isInMainlandChina(coordinate) {
+            NSLog(
+                "[Locus] China coordinate correction: map %.7f, %.7f -> injection %.7f, %.7f",
+                coordinate.latitude,
+                coordinate.longitude,
+                injectionCoordinate.latitude,
+                injectionCoordinate.longitude
+            )
+        }
         let result = LocationEngine.set(
-            latitude: coordinate.latitude,
-            longitude: coordinate.longitude,
+            latitude: injectionCoordinate.latitude,
+            longitude: injectionCoordinate.longitude,
             pairingPath: pairing.pairingPath,
             deviceIP: TunnelConfig.targetIP
         )
@@ -346,9 +356,10 @@ final class SpoofSession: ObservableObject {
         resendTimer = Timer.scheduledTimer(withTimeInterval: 8, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self, let sim = self.simulated else { return }
+                let injectionCoordinate = ChinaCoordinateTransform.injectionCoordinate(from: sim)
                 _ = LocationEngine.set(
-                    latitude: sim.latitude,
-                    longitude: sim.longitude,
+                    latitude: injectionCoordinate.latitude,
+                    longitude: injectionCoordinate.longitude,
                     pairingPath: pairing.pairingPath,
                     deviceIP: TunnelConfig.targetIP
                 )
