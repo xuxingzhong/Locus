@@ -64,7 +64,15 @@ enum LocationEngine {
         queue.sync { _lastRemotePairingPort }
     }
 
-    static var isSessionActive: Bool { locationSimulation != nil }
+    static var isSessionActive: Bool { queue.sync { locationSimulation != nil } }
+
+    static func refreshRemotePairingPort() -> UInt16? {
+        queue.sync {
+            let port = discoverRemotePairingPort(timeout: 3.0)
+            if let port { _lastRemotePairingPort = port }
+            return port
+        }
+    }
 
     static func set(latitude: Double, longitude: Double, pairingPath: String, deviceIP: String) -> Result<Void, LocationEngineError> {
         var result: Result<Void, LocationEngineError> = .failure(.locationSet)
