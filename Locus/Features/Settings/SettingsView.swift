@@ -11,6 +11,9 @@ struct SettingsView: View {
     @State private var showNameEasterEgg = false
     @State private var tunnelIP = TunnelConfig.targetIP
     @State private var localDevVPNInstalled = LocalDevVPN.isInstalled
+    @State private var diagnosticVPNConnected = LocalDevVPN.isConnected
+    @State private var diagnosticPort = LocationEngine.lastRemotePairingPort
+    @State private var diagnosticRefreshing = false
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppLanguage.defaultsKey) private var languageRawValue = AppLanguage.system.rawValue
 
@@ -112,6 +115,36 @@ struct SettingsView: View {
                     Text("Connect LocalDevVPN before teleporting. Default tunnel IP is 10.7.0.1. Locus discovers the current _remotepairing._tcp port automatically when starting a new session; the last port used is shown above. Start a spoof on Wi‑Fi first; it can keep working on cellular afterward.")
                 }
 
+                Section("Connection Diagnostics") {
+                    LabeledContent("RPPairing") {
+                        diagnosticValue(pairing.hasPairingFile, ready: "Ready", notReady: "Missing")
+                    }
+                    LabeledContent("LocalDevVPN") {
+                        diagnosticValue(diagnosticVPNConnected, ready: "Connected", notReady: "Not connected")
+                    }
+                    LabeledContent("Tunnel IP", value: TunnelConfig.targetIP)
+                    LabeledContent("Remote Pairing Port") {
+                        Text(diagnosticPort.map(String.init) ?? String(localized: "Not discovered yet"))
+                            .font(.body.monospacedDigit())
+                    }
+                    LabeledContent("Developer Tunnel") {
+                        diagnosticValue(LocationEngine.isSessionActive, ready: "Active", notReady: "Inactive")
+                    }
+                    Button {
+                        refreshDiagnostics()
+                    } label: {
+                        if diagnosticRefreshing {
+                            HStack {
+                                ProgressView()
+                                Text("Checking…")
+                            }
+                        } else {
+                            Label("Run Diagnostics", systemImage: "arrow.clockwise")
+                        }
+                    }
+                    .disabled(diagnosticRefreshing)
+                }
+
                 Section("Privacy") {
                     Text("Fully on-device. Favorites and recents stay in UserDefaults. No analytics, no accounts, nothing uploaded.")
                         .font(.footnote)
@@ -174,12 +207,36 @@ struct SettingsView: View {
             }
             .onAppear {
                 localDevVPNInstalled = LocalDevVPN.isInstalled
+                diagnosticVPNConnected = LocalDevVPN.isConnected
+                diagnosticPort = LocationEngine.lastRemotePairingPort
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
                     localDevVPNInstalled = LocalDevVPN.isInstalled
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func diagnosticValue(_ value: Bool, ready: LocalizedStringKey, notReady: LocalizedStringKey) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: value ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .foregroundStyle(value ? LocusTheme.statusGood : LocusTheme.statusWarn)
+            Text(value ? ready : notReady)
+        }
+    }
+
+    private func refreshDiagnostics() {
+        diagnosticVPNConnected = LocalDevVPN.isConnected
+        diagnosticRefreshing = true
+        Task {
+            let port = await Task.detached(priority: .userInitiated) {
+                LocationEngine.refreshRemotePairingPort()
+            }.value
+            diagnosticPort = port ?? LocationEngine.lastRemotePairingPort
+            diagnosticVPNConnected = LocalDevVPN.isConnected
+            diagnosticRefreshing = false
         }
     }
 }
