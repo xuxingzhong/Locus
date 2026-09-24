@@ -86,18 +86,12 @@ enum LocationEngine {
     static func clear(pairingPath: String, deviceIP: String) -> Result<Void, LocationEngineError> {
         var result: Result<Void, LocationEngineError> = .failure(.locationClear)
         queue.sync {
-            var code = clearLocked()
-            if code != ok {
-                // The local simulation handle can disappear while iOS still
-                // retains the simulated fix. Reconnect, create a fresh
-                // simulation service handle, then explicitly clear locationd.
-                let reconnect = setLocked(latitude: 0, longitude: 0, pairingPath: pairingPath, deviceIP: deviceIP)
-                if reconnect == ok {
-                    code = clearLocked()
-                } else {
-                    code = reconnect
-                }
-            }
+            // Always use a fresh DVT LocationSimulation channel for restore.
+            // This mirrors pymobiledevice3's standalone
+            // `developer dvt simulate-location clear` command and, critically,
+            // never sends a dummy coordinate such as 0,0 before clearing.
+            cleanup()
+            let code = clearWithFreshSessionLocked(pairingPath: pairingPath, deviceIP: deviceIP)
             result = code == ok ? .success(()) : .failure(.from(code: code))
         }
         return result
@@ -265,6 +259,90 @@ enum LocationEngine {
         lock.lock()
         defer { lock.unlock() }
         return resolvedPort
+    }
+
+    private static func clearWithFreshSessionLocked(pairingPath: String, deviceIP: String) -> Int32 {
+        var pairingHandle: OpaquePointer?
+        if let pairingError = pairingPath.withCString({ rp_pairing_file_read($0, &pairingHandle) }) {
+            idevice_error_free(pairingError)
+            return pairingRead
+        }
+        guard let pairingHandle else { return pairingRead }
+        defer { rp_pairing_file_free(pairingHandle) }
+
+        func connectAndClear(discoveryTimeout: TimeInterval) -> Int32 {
+            cleanup()
+
+            let remotePairingPort = discoverRemotePairingPort(timeout: discoveryTimeout)
+                ?? _lastRemotePairingPort
+                ?? fallbackRemotePairingPort
+            _lastRemotePairingPort = remotePairingPort
+            NSLog("[Locus] Restore real location using Remote Pairing port: %u", remotePairingPort)
+
+            var address = sockaddr_in()
+            address.sin_family = sa_family_t(AF_INET)
+            address.sin_port = in_port_t(remotePairingPort).bigEndian
+            let inetResult = deviceIP.withCString { inet_pton(AF_INET, $0, &address.sin_addr) }
+            guard inetResult == 1 else { return invalidIP }
+
+            let tunnelError = withUnsafePointer(to: &address) { pointer in
+                pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    tunnel_create_rppairing(
+                        $0,
+                        socklen_t(MemoryLayout<sockaddr_in>.stride),
+                        "LocusLocationClear",
+                        pairingHandle,
+                        nil,
+                        nil,
+                        &adapter,
+                        &handshake
+                    )
+                }
+            }
+            if let tunnelError {
+                idevice_error_free(tunnelError)
+                cleanup()
+                return tunnelCreate
+            }
+
+            if let remoteServerError = remote_server_connect_rsd(adapter, handshake, &remoteServer) {
+                idevice_error_free(remoteServerError)
+                cleanup()
+                return remoteServerCode
+            }
+
+            if let simError = location_simulation_new(remoteServer, &locationSimulation) {
+                idevice_error_free(simError)
+                cleanup()
+                return simulationCreate
+            }
+            remoteServer = nil
+
+            guard let locationSimulation else {
+                cleanup()
+                return simulationCreate
+            }
+
+            // This maps directly to DVT stopLocationSimulation. Do not call
+            // location_simulation_set first: restore must be a clear-only
+            // command on a newly opened service channel.
+            if let clearError = location_simulation_clear(locationSimulation) {
+                idevice_error_free(clearError)
+                cleanup()
+                return locationClear
+            }
+
+            cleanup()
+            return ok
+        }
+
+        let firstCode = connectAndClear(discoveryTimeout: 2.5)
+        guard firstCode != ok else { return ok }
+        guard firstCode != invalidIP && firstCode != pairingRead else { return firstCode }
+
+        NSLog("[Locus] Initial restore session failed with code %d; retrying fresh clear session", firstCode)
+        Thread.sleep(forTimeInterval: 0.5)
+        return connectAndClear(discoveryTimeout: 3.5)
     }
 
     private static func clearLocked() -> Int32 {
