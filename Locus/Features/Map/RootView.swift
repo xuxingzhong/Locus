@@ -82,7 +82,7 @@ struct StatusBarView: View {
 
     private var title: String {
         switch display {
-        case .notSpoofing: return "Not Spoofing"
+        case .notSpoofing: return "Real Location"
         case .connectVPN: return "Connect LocalDevVPN"
         case .status(let text): return text
         }
@@ -206,7 +206,7 @@ struct BottomControlsView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "dot.circle.and.hand.point.up.left.fill")
-                        Text(session.joystickActive ? "On" : "Joy")
+                        Text(LocalizedStringKey(session.joystickActive ? "On" : "Joy"))
                             .lineLimit(1)
                     }
                     .font(.subheadline.weight(.semibold))
@@ -224,7 +224,7 @@ struct BottomControlsView: View {
                     Button {
                         session.stop(pairing: pairing)
                     } label: {
-                        Text("Stop")
+                        Text("Restore Location")
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(.white)
                             .frame(minWidth: 72)
