@@ -78,6 +78,8 @@ final class SpoofSession: ObservableObject {
     @Published var lastError: String?
     @Published var isBusy = false
     @Published var joystickActive = false
+    /// Explicit map-camera request for programmatic selections such as Favorites/Recents.
+    @Published var mapFocusRequest: MapFocusRequest?
 
     @Published var favorites: [SavedPlace] = []
     @Published var recents: [SavedPlace] = []
@@ -115,6 +117,9 @@ final class SpoofSession: ObservableObject {
             return
         }
         pin = coordinate
+        // A favorite/recent may be tapped repeatedly or may match the current pin.
+        // Publish a new identity every time so MapHomeView always receives a camera request.
+        mapFocusRequest = MapFocusRequest(coordinate: coordinate)
         apply(coordinate, pairing: pairing, markRecent: true)
     }
 
@@ -446,5 +451,15 @@ final class SpoofSession: ObservableObject {
         let dLat = northMeters / earth * (180 / .pi)
         let dLon = eastMeters / (earth * cos(coordinate.latitude * .pi / 180)) * (180 / .pi)
         return CLLocationCoordinate2D(latitude: coordinate.latitude + dLat, longitude: coordinate.longitude + dLon)
+    }
+}
+
+
+struct MapFocusRequest: Identifiable, Equatable {
+    let id = UUID()
+    let coordinate: CLLocationCoordinate2D
+
+    static func == (lhs: MapFocusRequest, rhs: MapFocusRequest) -> Bool {
+        lhs.id == rhs.id
     }
 }
