@@ -98,3 +98,27 @@
 "Run" = "Run";
 "Cycle" = "Cycle";
 "Drive" = "Drive";
+
+"Real Location" = "Real Location";
+"Restore Location" = "Restore Location";
+"Connect LocalDevVPN before teleporting." = "Connect LocalDevVPN before teleporting.";
+"Connection Diagnostics" = "Connection Diagnostics";
+"RPPairing" = "RPPairing";
+"Ready" = "Ready";
+"Missing" = "Missing";
+"LocalDevVPN" = "LocalDevVPN";
+"Tunnel IP" = "Tunnel IP";
+"Developer Tunnel" = "Developer Tunnel";
+"Active" = "Active";
+"Inactive" = "Inactive";
+"Checking…" = "Checking…";
+"Run Diagnostics" = "Run Diagnostics";
+"Tunnel IP is invalid. Check Settings → Tunnel IP (usually 10.7.0.1)." = "Tunnel IP is invalid. Check Settings → Tunnel IP (usually 10.7.0.1).";
+"Could not read the RPPairing file. Generate one with idevice_pair in RPPairing mode." = "Could not read the RPPairing file. Generate one with idevice_pair in RPPairing mode.";
+"Could not open the developer tunnel. Is LocalDevVPN connected on Wi‑Fi?" = "Could not open the developer tunnel. Is LocalDevVPN connected on Wi‑Fi?";
+"Connected to the tunnel but RemoteXPC handshake failed." = "Connected to the tunnel but RemoteXPC handshake failed.";
+"Could not open Apple’s location simulation service." = "Could not open Apple’s location simulation service.";
+"Failed to set simulated coordinates." = "Failed to set simulated coordinates.";
+"Failed to clear simulated location." = "Failed to clear simulated location.";
+"No active simulation session." = "No active simulation session.";
+"Locus spoof dropped" = "Locus spoof dropped";
