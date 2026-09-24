@@ -105,6 +105,11 @@ final class SpoofSession: ObservableObject {
     }
 
     func teleport(to coordinate: CLLocationCoordinate2D, pairing: PairingStore) {
+        guard LocalDevVPN.isConnected else {
+            lastError = "Connect LocalDevVPN before teleporting."
+            LocalDevVPN.openOrInstall()
+            return
+        }
         guard pairing.hasPairingFile else {
             lastError = "Import an RPPairing file in Settings first."
             return
