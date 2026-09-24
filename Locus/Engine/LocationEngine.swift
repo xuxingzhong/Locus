@@ -83,10 +83,21 @@ enum LocationEngine {
         return result
     }
 
-    static func clear() -> Result<Void, LocationEngineError> {
-        var result: Result<Void, LocationEngineError> = .failure(.notActive)
+    static func clear(pairingPath: String, deviceIP: String) -> Result<Void, LocationEngineError> {
+        var result: Result<Void, LocationEngineError> = .failure(.locationClear)
         queue.sync {
-            let code = clearLocked()
+            var code = clearLocked()
+            if code != ok {
+                // The local simulation handle can disappear while iOS still
+                // retains the simulated fix. Reconnect, create a fresh
+                // simulation service handle, then explicitly clear locationd.
+                let reconnect = setLocked(latitude: 0, longitude: 0, pairingPath: pairingPath, deviceIP: deviceIP)
+                if reconnect == ok {
+                    code = clearLocked()
+                } else {
+                    code = reconnect
+                }
+            }
             result = code == ok ? .success(()) : .failure(.from(code: code))
         }
         return result
