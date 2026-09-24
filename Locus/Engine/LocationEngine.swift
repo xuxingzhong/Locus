@@ -270,18 +270,11 @@ enum LocationEngine {
     private static func clearLocked() -> Int32 {
         guard let locationSimulation else { return locationClear }
         let err = location_simulation_clear(locationSimulation)
+        cleanup()
         if let err {
             idevice_error_free(err)
-            cleanup()
             return locationClear
         }
-
-        // stopLocationSimulation is sent as a no-reply DTX command. Keep the
-        // DVT/RSD tunnel alive briefly so iOS can consume the clear before the
-        // transport is torn down; otherwise the call can report success while
-        // locationd remains pinned to the simulated fix until reboot.
-        Thread.sleep(forTimeInterval: 0.35)
-        cleanup()
         return ok
     }
 }
