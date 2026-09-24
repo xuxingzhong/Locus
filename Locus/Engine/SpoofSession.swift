@@ -50,6 +50,9 @@ enum SpoofStatus: Equatable {
     case connecting
     case active
     case reconnecting
+    case restoring
+    case restored
+    case restoreFailed(String)
     case dropped(String)
 
     var label: String {
@@ -58,6 +61,9 @@ enum SpoofStatus: Equatable {
         case .connecting: return "Starting…"
         case .active: return "Spoofing"
         case .reconnecting: return "Reconnecting…"
+        case .restoring: return "Restoring…"
+        case .restored: return "Location Restored"
+        case .restoreFailed: return "Restore Failed"
         case .dropped: return "Interrupted"
         }
     }
@@ -103,6 +109,8 @@ final class SpoofSession: ObservableObject {
     var isSpoofing: Bool {
         if case .active = status { return true }
         if case .reconnecting = status { return true }
+        if case .restoring = status { return true }
+        if case .restoreFailed = status { return true }
         return false
     }
 
@@ -124,29 +132,44 @@ final class SpoofSession: ObservableObject {
     }
 
     func stop(pairing: PairingStore) {
+        guard status != .restoring else { return }
+
         routeTask?.cancel()
         routeTask = nil
         stopJoystick()
         stopResend()
         stopHealth()
+
+        status = .restoring
         isBusy = true
-        let result = LocationEngine.clear(
-            pairingPath: pairing.pairingPath,
-            deviceIP: TunnelConfig.targetIP
-        )
-        isBusy = false
-        switch result {
-        case .success:
-            simulated = nil
-            status = .idle
-            endBackground()
-            // Keep location updates running so the map puck / locate button
-            // can return to the real GPS fix (not the leftover pin).
-            locationKeeper.start()
-        case .failure(let error):
-            lastError = error.localizedDescription
-            status = .dropped(error.localizedDescription)
-            postDropNotification(error.localizedDescription)
+        lastError = nil
+
+        let pairingPath = pairing.pairingPath
+        let deviceIP = TunnelConfig.targetIP
+
+        Task {
+            let result = await Task.detached(priority: .userInitiated) {
+                LocationEngine.clear(pairingPath: pairingPath, deviceIP: deviceIP)
+            }.value
+
+            isBusy = false
+            switch result {
+            case .success:
+                simulated = nil
+                status = .restored
+                endBackground()
+                locationKeeper.start()
+
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    guard let self, self.status == .restored else { return }
+                    self.status = .idle
+                }
+
+            case .failure(let error):
+                status = .restoreFailed(error.localizedDescription)
+                lastError = error.localizedDescription
+            }
         }
     }
 
