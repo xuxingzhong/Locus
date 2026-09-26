@@ -93,6 +93,7 @@ final class SpoofSession: ObservableObject {
     @Published var recents: [SavedPlace] = []
 
     private var resendTimer: Timer?
+    private var simulationGeneration: UInt64 = 0
     private var healthTimer: Timer?
     private var joystickTimer: Timer?
     private var routeTask: Task<Void, Never>?
@@ -127,6 +128,7 @@ final class SpoofSession: ObservableObject {
             lastError = "Import an RPPairing file in Settings first."
             return
         }
+        simulationGeneration &+= 1
         pin = coordinate
         // A favorite/recent may be tapped repeatedly or may match the current pin.
         // Publish a new identity every time so MapHomeView always receives a camera request.
@@ -137,6 +139,10 @@ final class SpoofSession: ObservableObject {
     func stop(pairing: PairingStore) {
         guard status != .restoring && status != .waitingForRealLocation else { return }
 
+        // Retire every already-enqueued resend before clear starts. A Timer
+        // invalidation only prevents future ticks; a MainActor task created by
+        // an earlier tick may still be waiting to run.
+        simulationGeneration &+= 1
         routeTask?.cancel()
         routeTask = nil
         stopJoystick()
@@ -165,16 +171,13 @@ final class SpoofSession: ObservableObject {
                 // simulated-looking CLLocation. Keep a short settling state
                 // only for UX; do not convert it into a false failure.
                 simulated = nil
-                status = .waitingForRealLocation
+                status = .restored
                 endBackground()
-                locationKeeper.start()
+                locationKeeper.refresh()
 
                 Task { @MainActor [weak self] in
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    guard let self, self.status == .waitingForRealLocation else { return }
-                    self.status = .restored
                     try? await Task.sleep(nanoseconds: 1_500_000_000)
-                    guard self.status == .restored else { return }
+                    guard let self, self.status == .restored else { return }
                     self.status = .idle
                 }
 
@@ -396,10 +399,20 @@ final class SpoofSession: ObservableObject {
 
     private func startResend(pairing: PairingStore) {
         resendTimer?.invalidate()
+        let generation = simulationGeneration
         resendTimer = Timer.scheduledTimer(withTimeInterval: 8, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                guard let self, let sim = self.simulated else { return }
+                guard let self,
+                      generation == self.simulationGeneration,
+                      case .active = self.status,
+                      let sim = self.simulated else { return }
+
                 let injectionCoordinate = ChinaCoordinateTransform.injectionCoordinate(from: sim)
+
+                // Last gate before entering LocationEngine's serial queue.
+                // Stop/restore increments simulationGeneration first, so a
+                // queued tick from the old run cannot resurrect simulation.
+                guard generation == self.simulationGeneration else { return }
                 _ = LocationEngine.set(
                     latitude: injectionCoordinate.latitude,
                     longitude: injectionCoordinate.longitude,
