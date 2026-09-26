@@ -332,6 +332,11 @@ enum LocationEngine {
                 return locationClear
             }
 
+            // Match TLocation's clear lifecycle: a successful FFI return means
+            // the device accepted the DVT clear, but tearing the service/tunnel
+            // down immediately can race the device processing that command.
+            // Keep the clear-only session alive briefly, off the main thread.
+            Thread.sleep(forTimeInterval: 0.3)
             cleanup()
             return ok
         }
