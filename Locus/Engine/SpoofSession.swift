@@ -51,6 +51,7 @@ enum SpoofStatus: Equatable {
     case active
     case reconnecting
     case restoring
+    case waitingForRealLocation
     case restored
     case restoreFailed(String)
     case dropped(String)
@@ -62,6 +63,7 @@ enum SpoofStatus: Equatable {
         case .active: return "Spoofing"
         case .reconnecting: return "Reconnecting…"
         case .restoring: return "Restoring…"
+        case .waitingForRealLocation: return "Waiting for Real Location…"
         case .restored: return "Location Restored"
         case .restoreFailed: return "Restore Failed"
         case .dropped: return "Interrupted"
@@ -110,6 +112,7 @@ final class SpoofSession: ObservableObject {
         if case .active = status { return true }
         if case .reconnecting = status { return true }
         if case .restoring = status { return true }
+        if case .waitingForRealLocation = status { return true }
         if case .restoreFailed = status { return true }
         return false
     }
@@ -132,7 +135,7 @@ final class SpoofSession: ObservableObject {
     }
 
     func stop(pairing: PairingStore) {
-        guard status != .restoring else { return }
+        guard status != .restoring && status != .waitingForRealLocation else { return }
 
         routeTask?.cancel()
         routeTask = nil
@@ -155,15 +158,29 @@ final class SpoofSession: ObservableObject {
             isBusy = false
             switch result {
             case .success:
-                simulated = nil
-                status = .restored
+                let previousSimulated = simulated
+                status = .waitingForRealLocation
                 endBackground()
                 locationKeeper.start()
 
-                Task { @MainActor [weak self] in
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    guard let self, self.status == .restored else { return }
-                    self.status = .idle
+                let restored = await waitForFreshRealLocation(
+                    after: Date(),
+                    previousSimulated: previousSimulated,
+                    timeout: 10
+                )
+
+                guard status == .waitingForRealLocation else { return }
+                if restored {
+                    simulated = nil
+                    status = .restored
+                    Task { @MainActor [weak self] in
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        guard let self, self.status == .restored else { return }
+                        self.status = .idle
+                    }
+                } else {
+                    status = .restoreFailed(String(localized: "Timed out waiting for a fresh real location fix."))
+                    lastError = String(localized: "Timed out waiting for a fresh real location fix.")
                 }
 
             case .failure(let error):
@@ -172,6 +189,39 @@ final class SpoofSession: ObservableObject {
             }
         }
     }
+
+    private func waitForFreshRealLocation(
+        after startedAt: Date,
+        previousSimulated: CLLocationCoordinate2D?,
+        timeout: TimeInterval
+    ) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+
+        while Date() < deadline {
+            if let location = locationKeeper.lastKnownLocation,
+               location.timestamp >= startedAt.addingTimeInterval(-0.25),
+               location.horizontalAccuracy >= 0 {
+                if let previousSimulated {
+                    let previous = CLLocation(
+                        latitude: previousSimulated.latitude,
+                        longitude: previousSimulated.longitude
+                    )
+                    // A post-clear fix that has moved away from the injected
+                    // coordinate is strong evidence that Core Location has
+                    // resumed a real provider. Allow a small GPS jitter radius.
+                    if location.distance(from: previous) > max(25, location.horizontalAccuracy) {
+                        return true
+                    }
+                } else {
+                    return true
+                }
+            }
+
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        return false
+    }
+
 
     /// Best-known real device coordinate (not the teleport pin).
     var realCoordinate: CLLocationCoordinate2D? {
