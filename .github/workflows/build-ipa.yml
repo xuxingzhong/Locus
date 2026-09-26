@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
     paths:
       - "Locus/**"
       - "Vendor/**"
@@ -36,6 +38,13 @@ jobs:
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
 
+      - name: Apply release version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Locus/Resources/Info.plist || true
+          echo "MARKETING_VERSION=$VERSION" >> "$GITHUB_ENV"
+
       - name: Build unsigned app
         run: |
           set -o pipefail
@@ -48,6 +57,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION="${MARKETING_VERSION:-1.0.2}" \
             build
 
       - name: Package unsigned IPA
@@ -66,3 +76,11 @@ jobs:
           path: Locus-unsigned.ipa
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Locus-unsigned.ipa
+          generate_release_notes: true
+          fail_on_unmatched_files: true
