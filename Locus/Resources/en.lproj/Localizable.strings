@@ -126,3 +126,6 @@
 "Restoring…" = "Restoring…";
 "Location Restored" = "Location Restored";
 "Restore Failed" = "Restore Failed";
+"Waiting for Real Location…" = "Waiting for Real Location…";
+"Waiting…" = "Waiting…";
+"Timed out waiting for a fresh real location fix." = "Timed out waiting for a fresh real location fix.";
