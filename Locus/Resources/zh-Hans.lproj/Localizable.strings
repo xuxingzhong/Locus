@@ -154,3 +154,6 @@
 "Restoring…" = "正在恢复真实定位…";
 "Location Restored" = "已恢复真实定位";
 "Restore Failed" = "恢复真实定位失败";
+"Waiting for Real Location…" = "正在等待真实定位…";
+"Waiting…" = "等待定位…";
+"Timed out waiting for a fresh real location fix." = "等待新的真实定位超时，请重试恢复定位。";
