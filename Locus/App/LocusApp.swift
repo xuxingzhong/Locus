@@ -31,6 +31,9 @@ struct LocusApp: App {
             .onOpenURL { url in
                 handleIncoming(url)
             }
+            .task {
+                await UpdateManager.shared.checkIfDue()
+            }
             .onAppear {
                 if !setupComplete, pairing.hasPairingFile, !SetupGate.isInProgress {
                     SetupGate.markComplete()
