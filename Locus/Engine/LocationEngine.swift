@@ -66,6 +66,13 @@ enum LocationEngine {
 
     static var isSessionActive: Bool { queue.sync { locationSimulation != nil } }
 
+    /// Release every RemotePairing/DVT handle without creating a new session.
+    /// Used before handing an IPA to SideStore so Locus cannot compete for the
+    /// same device gateway while SideStore installs the update.
+    static func releaseForUpdate() {
+        queue.sync { cleanup() }
+    }
+
     static func refreshRemotePairingPort() -> UInt16? {
         queue.sync {
             let port = discoverRemotePairingPort(timeout: 3.0)
