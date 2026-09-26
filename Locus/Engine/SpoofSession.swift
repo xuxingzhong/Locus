@@ -86,6 +86,7 @@ final class SpoofSession: ObservableObject {
     @Published var lastError: String?
     @Published var isBusy = false
     @Published var joystickActive = false
+    @Published private(set) var isPreparingForUpdate = false
     /// Explicit map-camera request for programmatic selections such as Favorites/Recents.
     @Published var mapFocusRequest: MapFocusRequest?
 
@@ -186,6 +187,47 @@ final class SpoofSession: ObservableObject {
                 lastError = error.localizedDescription
             }
         }
+    }
+
+    /// Quiesce Locus before SideStore installs an update. Unlike normal Stop,
+    /// this never opens a fresh clear-only DVT session after teardown.
+    /// If a spoof is active, clear it first; then retire all timers/tasks and
+    /// release every remaining RemotePairing/DVT handle.
+    func prepareForUpdate(pairing: PairingStore) async -> Result<Void, LocationEngineError> {
+        guard !isPreparingForUpdate else { return .success(()) }
+        isPreparingForUpdate = true
+        simulationGeneration &+= 1
+        routeTask?.cancel()
+        routeTask = nil
+        stopJoystick()
+        stopResend()
+        stopHealth()
+
+        let shouldClear = simulated != nil || LocationEngine.isSessionActive
+        let pairingPath = pairing.pairingPath
+        let deviceIP = TunnelConfig.targetIP
+
+        let result = await Task.detached(priority: .userInitiated) {
+            if shouldClear, !pairingPath.isEmpty {
+                let clearResult = LocationEngine.clear(pairingPath: pairingPath, deviceIP: deviceIP)
+                if case .failure = clearResult {
+                    LocationEngine.releaseForUpdate()
+                    return clearResult
+                }
+            }
+            LocationEngine.releaseForUpdate()
+            return Result<Void, LocationEngineError>.success(())
+        }.value
+
+        if case .success = result {
+            simulated = nil
+            status = .idle
+            isBusy = false
+            endBackground()
+            locationKeeper.stop()
+        }
+        isPreparingForUpdate = false
+        return result
     }
 
     /// Best-known real device coordinate (not the teleport pin).
