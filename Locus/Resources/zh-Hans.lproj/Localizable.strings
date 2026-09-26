@@ -157,3 +157,16 @@
 "Waiting for Real Location…" = "正在等待真实定位…";
 "Waiting…" = "等待定位…";
 "Timed out waiting for a fresh real location fix." = "等待新的真实定位超时，请重试恢复定位。";
+
+"Software Update" = "软件更新";
+"Current Version" = "当前版本";
+"Latest Version" = "最新版本";
+"Update Now" = "立即更新";
+"Locus is up to date" = "Locus 已是最新版本";
+"Check for Updates" = "检查更新";
+"Checking for Updates…" = "正在检查更新…";
+"Update Locus" = "更新 Locus";
+"Prepare & Open SideStore" = "准备更新并打开 SideStore";
+"Updates are installed by SideStore. Locus releases its developer tunnel before opening SideStore so the installer can connect reliably." = "更新由 SideStore 安装。打开 SideStore 前，Locus 会释放开发者隧道，避免安装时发生连接冲突。";
+"The latest release does not contain an IPA." = "最新 Release 中没有找到 IPA 文件。";
+"The update download URL is invalid." = "更新下载地址无效。";
