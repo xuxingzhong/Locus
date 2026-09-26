@@ -170,3 +170,4 @@
 "Updates are installed by SideStore. Locus releases its developer tunnel before opening SideStore so the installer can connect reliably." = "更新由 SideStore 安装。打开 SideStore 前，Locus 会释放开发者隧道，避免安装时发生连接冲突。";
 "The latest release does not contain an IPA." = "最新 Release 中没有找到 IPA 文件。";
 "The update download URL is invalid." = "更新下载地址无效。";
+"Update available format" = "发现新版本 %@。Locus 将先停止定位模拟并释放开发者隧道，然后打开 SideStore 安装更新。";
