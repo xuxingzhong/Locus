@@ -129,3 +129,16 @@
 "Waiting for Real Location…" = "Waiting for Real Location…";
 "Waiting…" = "Waiting…";
 "Timed out waiting for a fresh real location fix." = "Timed out waiting for a fresh real location fix.";
+
+"Software Update" = "Software Update";
+"Current Version" = "Current Version";
+"Latest Version" = "Latest Version";
+"Update Now" = "Update Now";
+"Locus is up to date" = "Locus is up to date";
+"Check for Updates" = "Check for Updates";
+"Checking for Updates…" = "Checking for Updates…";
+"Update Locus" = "Update Locus";
+"Prepare & Open SideStore" = "Prepare & Open SideStore";
+"Updates are installed by SideStore. Locus releases its developer tunnel before opening SideStore so the installer can connect reliably." = "Updates are installed by SideStore. Locus releases its developer tunnel before opening SideStore so the installer can connect reliably.";
+"The latest release does not contain an IPA." = "The latest release does not contain an IPA.";
+"The update download URL is invalid." = "The update download URL is invalid.";
