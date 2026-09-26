@@ -1,9 +1,12 @@
 name: Release IPA
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, for example 1.0.3"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -11,9 +14,29 @@ permissions:
 jobs:
   release:
     runs-on: macos-15
+    env:
+      VERSION: ${{ inputs.version }}
+      TAG_NAME: v${{ inputs.version }}
     steps:
-      - name: Checkout
+      - name: Validate version
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid version '$VERSION'. Use a value like 1.0.3."
+            exit 1
+          fi
+
+      - name: Checkout main
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Ensure tag does not already exist
+        run: |
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1 || git ls-remote --exit-code --tags origin "refs/tags/$TAG_NAME" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG_NAME already exists."
+            exit 1
+          fi
 
       - name: Select Xcode 26
         uses: maxim-lobanov/setup-xcode@v1
@@ -25,7 +48,6 @@ jobs:
 
       - name: Set release version
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
           sed -i '' -E 's/MARKETING_VERSION: "[^"]+"/MARKETING_VERSION: "'"$VERSION"'"/' project.yml
           echo "Release version: $VERSION"
 
@@ -55,9 +77,16 @@ jobs:
           cd "$RUNNER_TEMP/ipa"
           /usr/bin/zip -qry "$GITHUB_WORKSPACE/Locus-unsigned.ipa" Payload
 
+      - name: Create release tag
+        run: |
+          git tag "$TAG_NAME" "$GITHUB_SHA"
+          git push origin "$TAG_NAME"
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Locus ${{ env.TAG_NAME }}
           files: Locus-unsigned.ipa
           generate_release_notes: true
           fail_on_unmatched_files: true
