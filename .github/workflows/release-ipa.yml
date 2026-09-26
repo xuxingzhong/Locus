@@ -1,11 +1,16 @@
 name: Release IPA
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".release-version"
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version, for example 1.0.3"
-        required: true
+        description: "Optional version override, for example 1.1.0. Leave empty to use .release-version."
+        required: false
         type: string
 
 permissions:
@@ -14,47 +19,69 @@ permissions:
 jobs:
   release:
     runs-on: macos-15
-    env:
-      VERSION: ${{ inputs.version }}
-      TAG_NAME: v${{ inputs.version }}
     steps:
-      - name: Validate version
-        run: |
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::Invalid version '$VERSION'. Use a value like 1.0.3."
-            exit 1
-          fi
-
       - name: Checkout main
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
 
-      - name: Ensure tag does not already exist
+      - name: Resolve release version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if git rev-parse "$TAG_NAME" >/dev/null 2>&1 || git ls-remote --exit-code --tags origin "refs/tags/$TAG_NAME" >/dev/null 2>&1; then
-            echo "::error::Tag $TAG_NAME already exists."
+          VERSION="$INPUT_VERSION"
+          if [ -z "$VERSION" ]; then
+            VERSION="$(tr -d '[:space:]' < .release-version)"
+          fi
+          VERSION="${VERSION#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid release version '$VERSION'."
             exit 1
+          fi
+          TAG_NAME="v$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "Release version: $VERSION"
+
+      - name: Skip existing release
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG_NAME already exists; nothing to publish."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Select Xcode 26
+        if: steps.existing.outputs.exists != 'true'
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '26.0'
 
       - name: Install XcodeGen
+        if: steps.existing.outputs.exists != 'true'
         run: brew install xcodegen
 
       - name: Set release version
+        if: steps.existing.outputs.exists != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           sed -i '' -E 's/MARKETING_VERSION: "[^"]+"/MARKETING_VERSION: "'"$VERSION"'"/' project.yml
           echo "Release version: $VERSION"
 
       - name: Generate Xcode project
+        if: steps.existing.outputs.exists != 'true'
         run: xcodegen generate
 
       - name: Build unsigned app
+        if: steps.existing.outputs.exists != 'true'
         run: |
           set -o pipefail
           xcodebuild \
@@ -69,6 +96,7 @@ jobs:
             build
 
       - name: Package unsigned IPA
+        if: steps.existing.outputs.exists != 'true'
         run: |
           APP_PATH="$RUNNER_TEMP/LocusDerivedData/Build/Products/Release-iphoneos/Locus.app"
           test -d "$APP_PATH"
@@ -78,15 +106,21 @@ jobs:
           /usr/bin/zip -qry "$GITHUB_WORKSPACE/Locus-unsigned.ipa" Payload
 
       - name: Create release tag
+        if: steps.existing.outputs.exists != 'true'
+        env:
+          TAG_NAME: ${{ steps.version.outputs.tag }}
         run: |
-          git tag "$TAG_NAME" "$GITHUB_SHA"
-          git push origin "$TAG_NAME"
+          if ! git ls-remote --exit-code --tags origin "refs/tags/$TAG_NAME" >/dev/null 2>&1; then
+            git tag "$TAG_NAME" "$GITHUB_SHA"
+            git push origin "$TAG_NAME"
+          fi
 
       - name: Publish GitHub Release
+        if: steps.existing.outputs.exists != 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.TAG_NAME }}
-          name: Locus ${{ env.TAG_NAME }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Locus ${{ steps.version.outputs.tag }}
           files: Locus-unsigned.ipa
           generate_release_notes: true
           fail_on_unmatched_files: true
