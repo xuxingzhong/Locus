@@ -14,6 +14,8 @@ struct SettingsView: View {
     @State private var diagnosticVPNConnected = LocalDevVPN.isConnected
     @State private var diagnosticPort = LocationEngine.lastRemotePairingPort
     @State private var diagnosticRefreshing = false
+    @StateObject private var updates = UpdateManager.shared
+    @State private var updateAlert = false
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppLanguage.defaultsKey) private var languageRawValue = AppLanguage.system.rawValue
 
@@ -145,6 +147,38 @@ struct SettingsView: View {
                     .disabled(diagnosticRefreshing)
                 }
 
+                Section("Software Update") {
+                    LabeledContent("Current Version", value: appVersion)
+                    if let release = updates.latestRelease {
+                        LabeledContent("Latest Version", value: release.version)
+                        if updates.hasUpdate {
+                            Button {
+                                updateAlert = true
+                            } label: {
+                                Label("Update Now", systemImage: "arrow.down.circle.fill")
+                            }
+                        } else {
+                            Label("Locus is up to date", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(LocusTheme.statusGood)
+                        }
+                    }
+                    Button {
+                        Task { await updates.check() }
+                    } label: {
+                        if updates.isChecking {
+                            HStack { ProgressView(); Text("Checking for Updates…") }
+                        } else {
+                            Label("Check for Updates", systemImage: "arrow.clockwise")
+                        }
+                    }
+                    .disabled(updates.isChecking)
+                    if let error = updates.errorMessage {
+                        Text(error).font(.footnote).foregroundStyle(.secondary)
+                    }
+                } footer: {
+                    Text("Updates are installed by SideStore. Locus releases its developer tunnel before opening SideStore so the installer can connect reliably.")
+                }
+
                 Section("Privacy") {
                     Text("Fully on-device. Favorites and recents stay in UserDefaults. No analytics, no accounts, nothing uploaded.")
                         .font(.footnote)
@@ -176,6 +210,16 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .alert("Update Locus", isPresented: $updateAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Prepare & Open SideStore") {
+                    Task { await installLatestUpdate() }
+                }
+            } message: {
+                if let release = updates.latestRelease {
+                    Text("Version \(release.version) is available. Locus will stop location simulation and release its developer tunnel before opening SideStore.")
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {
@@ -224,6 +268,22 @@ struct SettingsView: View {
             Image(systemName: value ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .foregroundStyle(value ? LocusTheme.statusGood : LocusTheme.statusWarn)
             Text(value ? ready : notReady)
+        }
+    }
+
+    private func installLatestUpdate() async {
+        guard let release = updates.latestRelease,
+              let sideStoreURL = updates.sideStoreInstallURL(for: release) else { return }
+
+        let result = await session.prepareForUpdate(pairing: pairing)
+        switch result {
+        case .success:
+            // Give the FFI/tunnel teardown a brief chance to settle before
+            // SideStore opens its own device gateway.
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            await UIApplication.shared.open(sideStoreURL)
+        case .failure(let error):
+            session.lastError = error.localizedDescription
         }
     }
 
