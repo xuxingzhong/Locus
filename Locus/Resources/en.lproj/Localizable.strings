@@ -142,3 +142,4 @@
 "Updates are installed by SideStore. Locus releases its developer tunnel before opening SideStore so the installer can connect reliably." = "Updates are installed by SideStore. Locus releases its developer tunnel before opening SideStore so the installer can connect reliably.";
 "The latest release does not contain an IPA." = "The latest release does not contain an IPA.";
 "The update download URL is invalid." = "The update download URL is invalid.";
+"Update available format" = "Version %@ is available. Locus will stop location simulation and release its developer tunnel before opening SideStore.";
