@@ -3,7 +3,9 @@ import Foundation
 
 final class BackgroundKeepAlive: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
-    private(set) var lastKnownCoordinate: CLLocationCoordinate2D?
+    private(set) var lastKnownLocation: CLLocation?
+
+    var lastKnownCoordinate: CLLocationCoordinate2D? { lastKnownLocation?.coordinate }
 
     override init() {
         super.init()
@@ -24,6 +26,6 @@ final class BackgroundKeepAlive: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        lastKnownCoordinate = locations.last?.coordinate
+        lastKnownLocation = locations.last
     }
 }
