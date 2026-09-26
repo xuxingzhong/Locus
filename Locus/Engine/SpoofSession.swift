@@ -199,21 +199,33 @@ final class SpoofSession: ObservableObject {
 
         while Date() < deadline {
             if let location = locationKeeper.lastKnownLocation,
-               location.timestamp >= startedAt.addingTimeInterval(-0.25),
+               location.timestamp >= startedAt.addingTimeInterval(-1.0),
                location.horizontalAccuracy >= 0 {
-                if let previousSimulated {
-                    let previous = CLLocation(
-                        latitude: previousSimulated.latitude,
-                        longitude: previousSimulated.longitude
-                    )
-                    // A post-clear fix that has moved away from the injected
-                    // coordinate is strong evidence that Core Location has
-                    // resumed a real provider. Allow a small GPS jitter radius.
-                    if location.distance(from: previous) > max(25, location.horizontalAccuracy) {
+                // Core Location explicitly tells us whether a fix is software
+                // simulated. This is much more reliable than comparing the
+                // distance with horizontalAccuracy: coarse fixes can report
+                // accuracy in hundreds/thousands of metres and made a genuine
+                // restored fix fail the old test.
+                if let source = location.sourceInformation,
+                   !source.isSimulatedBySoftware {
+                    return true
+                }
+
+                // Fallback for providers that don't expose sourceInformation.
+                // We only need evidence that the fix left the injected point;
+                // horizontalAccuracy must not be used as the distance threshold.
+                if location.sourceInformation == nil {
+                    if let previousSimulated {
+                        let previous = CLLocation(
+                            latitude: previousSimulated.latitude,
+                            longitude: previousSimulated.longitude
+                        )
+                        if location.distance(from: previous) > 15 {
+                            return true
+                        }
+                    } else {
                         return true
                     }
-                } else {
-                    return true
                 }
             }
 
