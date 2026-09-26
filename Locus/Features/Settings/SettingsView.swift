@@ -147,7 +147,8 @@ struct SettingsView: View {
                     .disabled(diagnosticRefreshing)
                 }
 
-                Section("Software Update") {
+                Section {
+
                     LabeledContent("Current Version", value: appVersion)
                     if let release = updates.latestRelease {
                         LabeledContent("Latest Version", value: release.version)
@@ -175,6 +176,8 @@ struct SettingsView: View {
                     if let error = updates.errorMessage {
                         Text(error).font(.footnote).foregroundStyle(.secondary)
                     }
+                } header: {
+                    Text("Software Update")
                 } footer: {
                     Text("Updates are installed by SideStore. Locus releases its developer tunnel before opening SideStore so the installer can connect reliably.")
                 }
