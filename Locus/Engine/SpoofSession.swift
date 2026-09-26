@@ -158,29 +158,24 @@ final class SpoofSession: ObservableObject {
             isBusy = false
             switch result {
             case .success:
-                let previousSimulated = simulated
+                // The DVT clear command is the authoritative restore result.
+                // Core Location callbacks inside Locus are not a reliable
+                // confirmation signal on iOS 26: Apple Maps can already be on
+                // the real fix while this process still receives/caches a
+                // simulated-looking CLLocation. Keep a short settling state
+                // only for UX; do not convert it into a false failure.
+                simulated = nil
                 status = .waitingForRealLocation
                 endBackground()
                 locationKeeper.start()
 
-                let restored = await waitForFreshRealLocation(
-                    after: Date(),
-                    previousSimulated: previousSimulated,
-                    timeout: 10
-                )
-
-                guard status == .waitingForRealLocation else { return }
-                if restored {
-                    simulated = nil
-                    status = .restored
-                    Task { @MainActor [weak self] in
-                        try? await Task.sleep(nanoseconds: 1_500_000_000)
-                        guard let self, self.status == .restored else { return }
-                        self.status = .idle
-                    }
-                } else {
-                    status = .restoreFailed(String(localized: "Timed out waiting for a fresh real location fix."))
-                    lastError = String(localized: "Timed out waiting for a fresh real location fix.")
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    guard let self, self.status == .waitingForRealLocation else { return }
+                    self.status = .restored
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    guard self.status == .restored else { return }
+                    self.status = .idle
                 }
 
             case .failure(let error):
@@ -189,51 +184,6 @@ final class SpoofSession: ObservableObject {
             }
         }
     }
-
-    private func waitForFreshRealLocation(
-        after startedAt: Date,
-        previousSimulated: CLLocationCoordinate2D?,
-        timeout: TimeInterval
-    ) async -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-
-        while Date() < deadline {
-            if let location = locationKeeper.lastKnownLocation,
-               location.timestamp >= startedAt.addingTimeInterval(-1.0),
-               location.horizontalAccuracy >= 0 {
-                // Core Location explicitly tells us whether a fix is software
-                // simulated. This is much more reliable than comparing the
-                // distance with horizontalAccuracy: coarse fixes can report
-                // accuracy in hundreds/thousands of metres and made a genuine
-                // restored fix fail the old test.
-                if let source = location.sourceInformation,
-                   !source.isSimulatedBySoftware {
-                    return true
-                }
-
-                // Fallback for providers that don't expose sourceInformation.
-                // We only need evidence that the fix left the injected point;
-                // horizontalAccuracy must not be used as the distance threshold.
-                if location.sourceInformation == nil {
-                    if let previousSimulated {
-                        let previous = CLLocation(
-                            latitude: previousSimulated.latitude,
-                            longitude: previousSimulated.longitude
-                        )
-                        if location.distance(from: previous) > 15 {
-                            return true
-                        }
-                    } else {
-                        return true
-                    }
-                }
-            }
-
-            try? await Task.sleep(nanoseconds: 250_000_000)
-        }
-        return false
-    }
-
 
     /// Best-known real device coordinate (not the teleport pin).
     var realCoordinate: CLLocationCoordinate2D? {
