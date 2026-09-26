@@ -430,13 +430,19 @@ final class SpoofSession: ObservableObject {
 
     private func startHealth(pairing: PairingStore) {
         healthTimer?.invalidate()
+        let generation = simulationGeneration
         healthTimer = Timer.scheduledTimer(withTimeInterval: 12, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                guard let self, let sim = self.simulated else { return }
+                guard let self,
+                      generation == self.simulationGeneration,
+                      let sim = self.simulated else { return }
+
                 if case .dropped = self.status {
+                    guard generation == self.simulationGeneration else { return }
                     self.status = .reconnecting
                     self.apply(sim, pairing: pairing, markRecent: false)
-                } else if !LocationEngine.isSessionActive, self.isSpoofing {
+                } else if case .active = self.status, !LocationEngine.isSessionActive {
+                    guard generation == self.simulationGeneration else { return }
                     self.status = .reconnecting
                     self.apply(sim, pairing: pairing, markRecent: false)
                 }
