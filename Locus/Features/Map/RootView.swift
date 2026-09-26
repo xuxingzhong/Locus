@@ -61,6 +61,8 @@ struct StatusBarView: View {
             return .status("Reconnecting…")
         case .restoring:
             return .status("Restoring…")
+        case .waitingForRealLocation:
+            return .status("Waiting for Real Location…")
         case .restored:
             return .status("Location Restored")
         case .restoreFailed:
@@ -79,7 +81,7 @@ struct StatusBarView: View {
         case .status:
             switch session.status {
             case .active: return LocusTheme.statusGood
-            case .connecting, .reconnecting, .restoring: return LocusTheme.statusWarn
+            case .connecting, .reconnecting, .restoring, .waitingForRealLocation: return LocusTheme.statusWarn
             case .restored: return LocusTheme.statusGood
             case .restoreFailed, .dropped: return LocusTheme.statusBad
             case .idle: return Color.primary.opacity(0.55)
@@ -232,12 +234,12 @@ struct BottomControlsView: View {
                         session.stop(pairing: pairing)
                     } label: {
                         HStack(spacing: 6) {
-                            if session.status == .restoring {
+                            if session.status == .restoring || session.status == .waitingForRealLocation {
                                 ProgressView()
                                     .controlSize(.small)
                                     .tint(.white)
                             }
-                            Text(session.status == .restoring ? "Restoring…" : "Restore Location")
+                            Text(session.status == .waitingForRealLocation ? "Waiting…" : (session.status == .restoring ? "Restoring…" : "Restore Location"))
                         }
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(.white)
@@ -248,7 +250,7 @@ struct BottomControlsView: View {
                             .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
-                    .disabled(session.status == .restoring)
+                    .disabled(session.status == .restoring || session.status == .waitingForRealLocation)
                 } else {
                     Button {
                         guard let pin = session.pin else {
