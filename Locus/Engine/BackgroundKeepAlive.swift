@@ -25,6 +25,14 @@ final class BackgroundKeepAlive: NSObject, CLLocationManagerDelegate {
         manager.stopUpdatingLocation()
     }
 
+    func refresh() {
+        // Bounce this app's Core Location stream after DVT clear so the map
+        // does not keep presenting a cached simulated fix.
+        manager.stopUpdatingLocation()
+        lastKnownLocation = nil
+        manager.startUpdatingLocation()
+    }
+
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         lastKnownLocation = locations.last
     }
