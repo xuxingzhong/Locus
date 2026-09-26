@@ -220,7 +220,7 @@ struct SettingsView: View {
                 }
             } message: {
                 if let release = updates.latestRelease {
-                    Text("Version \(release.version) is available. Locus will stop location simulation and release its developer tunnel before opening SideStore.")
+                    Text(String(format: String(localized: "Update available format"), release.version))
                 }
             }
             .toolbar {
