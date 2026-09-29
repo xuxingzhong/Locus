@@ -111,6 +111,19 @@ struct SettingsView: View {
                             systemImage: localDevVPNInstalled ? "lock.shield.fill" : "arrow.down.app.fill"
                         )
                     }
+                    Button {
+                        Task {
+                            do {
+                                try await EmbeddedTunnel.start()
+                                try? await Task.sleep(nanoseconds: 800_000_000)
+                                diagnosticVPNConnected = LocalDevVPN.isConnected
+                            } catch {
+                                session.lastError = error.localizedDescription
+                            }
+                        }
+                    } label: {
+                        Label("Start Built-in Tunnel (Experimental)", systemImage: "network.badge.shield.half.filled")
+                    }
                 } header: {
                     Text("Tunnel")
                 } footer: {
