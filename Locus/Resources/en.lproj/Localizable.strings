@@ -143,3 +143,4 @@
 "The latest release does not contain an IPA." = "The latest release does not contain an IPA.";
 "The update download URL is invalid." = "The update download URL is invalid.";
 "Update available format" = "Version %@ is available. Locus will stop location simulation and release its developer tunnel before opening SideStore.";
+"LocalDevVPN configuration hint" = "If the default LocalDevVPN configuration cannot connect, set Tunnel IP to 10.7.0.2/30 and Device IP to 10.7.0.1/32. Keep Locus Device Tunnel IP at 10.7.0.1.";
