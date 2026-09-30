@@ -114,7 +114,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Tunnel")
                 } footer: {
-                    Text("Connect LocalDevVPN before teleporting. Default tunnel IP is 10.7.0.1. Locus discovers the current _remotepairing._tcp port automatically when starting a new session; the last port used is shown above. Start a spoof on Wi‑Fi first; it can keep working on cellular afterward.")
+                    Text("LocalDevVPN configuration hint")
                 }
 
                 Section("Connection Diagnostics") {
