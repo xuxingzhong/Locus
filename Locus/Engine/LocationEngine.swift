@@ -97,8 +97,15 @@ enum LocationEngine {
             // This mirrors pymobiledevice3's standalone
             // `developer dvt simulate-location clear` command and, critically,
             // never sends a dummy coordinate such as 0,0 before clearing.
+            let startedAt = Date()
+            NSLog("[Locus] DVT restore started; hadLiveSession=%@", locationSimulation == nil ? "no" : "yes")
             cleanup()
             let code = clearWithFreshSessionLocked(pairingPath: pairingPath, deviceIP: deviceIP)
+            NSLog(
+                "[Locus] DVT restore finished code=%d duration=%.2fs; clear return does not confirm other apps",
+                code,
+                Date().timeIntervalSince(startedAt)
+            )
             result = code == ok ? .success(()) : .failure(.from(code: code))
         }
         return result
@@ -339,12 +346,14 @@ enum LocationEngine {
                 return locationClear
             }
 
-            // Match TLocation's clear lifecycle: a successful FFI return means
-            // the device accepted the DVT clear, but tearing the service/tunnel
-            // down immediately can race the device processing that command.
-            // Keep the clear-only session alive briefly, off the main thread.
-            Thread.sleep(forTimeInterval: 0.3)
+            // DVT stopLocationSimulation is not a cross-app acknowledgement.
+            // Give the device time to process the clear before releasing this
+            // fresh channel; this is a bounded settling delay, not proof that
+            // every app has discarded its old location.
+            NSLog("[Locus] DVT clear sent; holding session open for 1.0s")
+            Thread.sleep(forTimeInterval: 1.0)
             cleanup()
+            NSLog("[Locus] DVT clear session released")
             return ok
         }
 

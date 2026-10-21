@@ -120,6 +120,10 @@ final class SpoofSession: ObservableObject {
     }
 
     func teleport(to coordinate: CLLocationCoordinate2D, pairing: PairingStore) {
+        guard !isBusy && status != .restoring && status != .waitingForRealLocation else {
+            lastError = "Wait for the current location operation to finish."
+            return
+        }
         guard LocalDevVPN.isConnected else {
             lastError = "Connect LocalDevVPN before teleporting."
             LocalDevVPN.openOrInstall()
@@ -138,12 +142,13 @@ final class SpoofSession: ObservableObject {
     }
 
     func stop(pairing: PairingStore) {
-        guard status != .restoring && status != .waitingForRealLocation else { return }
+        guard !isBusy && status != .restoring && status != .waitingForRealLocation else { return }
 
         // Retire every already-enqueued resend before clear starts. A Timer
         // invalidation only prevents future ticks; a MainActor task created by
         // an earlier tick may still be waiting to run.
         simulationGeneration &+= 1
+        let restoreGeneration = simulationGeneration
         routeTask?.cancel()
         routeTask = nil
         stopJoystick()
@@ -162,15 +167,19 @@ final class SpoofSession: ObservableObject {
                 LocationEngine.clear(pairingPath: pairingPath, deviceIP: deviceIP)
             }.value
 
+            // A later update/stop request can retire this restore while the
+            // blocking DVT clear is in flight. Do not overwrite newer state.
+            guard restoreGeneration == simulationGeneration else {
+                NSLog("[Locus] Ignoring stale restore completion")
+                return
+            }
             isBusy = false
             switch result {
             case .success:
-                // The DVT clear command is the authoritative restore result.
-                // Core Location callbacks inside Locus are not a reliable
-                // confirmation signal on iOS 26: Apple Maps can already be on
-                // the real fix while this process still receives/caches a
-                // simulated-looking CLLocation. Keep a short settling state
-                // only for UX; do not convert it into a false failure.
+                // The DVT clear was sent without an FFI error. It does not
+                // confirm that all other apps have discarded cached locations.
+                // BackgroundKeepAlive logs a few new CoreLocation observations
+                // for diagnosis, but they cannot prove cross-app restoration.
                 simulated = nil
                 status = .restored
                 endBackground()

@@ -148,6 +148,32 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Button {
+                        // Works even after the normal restore button has
+                        // disappeared: issue a new standalone DVT clear.
+                        session.stop(pairing: pairing)
+                    } label: {
+                        Label("Clear Simulated Location Again", systemImage: "location.slash")
+                    }
+                    .disabled(
+                        !pairing.hasPairingFile
+                        || !diagnosticVPNConnected
+                        || session.isBusy
+                        || session.status == .restoring
+                        || session.status == .waitingForRealLocation
+                    )
+                    if case .restoreFailed(let reason) = session.status {
+                        Text(reason)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Location Recovery")
+                } footer: {
+                    Text("If an app still shows the simulated position, connect LocalDevVPN and try clearing again. This resends the DVT clear; it cannot reset another app's cached location.")
+                }
+
+                Section {
 
                     LabeledContent("Current Version", value: appVersion)
                     if let release = updates.latestRelease {
