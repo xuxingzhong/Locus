@@ -93,14 +93,33 @@ enum LocationEngine {
     static func clear(pairingPath: String, deviceIP: String) -> Result<Void, LocationEngineError> {
         var result: Result<Void, LocationEngineError> = .failure(.locationClear)
         queue.sync {
-            // Always use a fresh DVT LocationSimulation channel for restore.
-            // This mirrors pymobiledevice3's standalone
-            // `developer dvt simulate-location clear` command and, critically,
-            // never sends a dummy coordinate such as 0,0 before clearing.
+            // Clear on the same DVT channel that installed the simulation
+            // BEFORE dropping it. The location simulation service is
+            // connection-scoped; a successful clear on a fresh channel is not
+            // guaranteed to tear down a still-active previous channel.
+            // If the original channel is gone or rejects the clear, fall back
+            // to the standalone fresh-session clear used by pymobiledevice3.
             let startedAt = Date()
-            NSLog("[Locus] DVT restore started; hadLiveSession=%@", locationSimulation == nil ? "no" : "yes")
-            cleanup()
-            let code = clearWithFreshSessionLocked(pairingPath: pairingPath, deviceIP: deviceIP)
+            let hadLiveSession = locationSimulation != nil
+            NSLog("[Locus] DVT restore started; hadLiveSession=%@", hadLiveSession ? "yes" : "no")
+
+            let code: Int32
+            if hadLiveSession {
+                let activeCode = clearLocked()
+                if activeCode == ok {
+                    NSLog("[Locus] DVT clear succeeded on original location session")
+                    code = ok
+                } else {
+                    NSLog("[Locus] Original DVT clear failed code=%d; using fresh-session fallback", activeCode)
+                    code = clearWithFreshSessionLocked(pairingPath: pairingPath, deviceIP: deviceIP)
+                }
+            } else {
+                // No active session (e.g. app relaunched): still allow the
+                // user to send a standalone clear without first teleporting.
+                cleanup()
+                code = clearWithFreshSessionLocked(pairingPath: pairingPath, deviceIP: deviceIP)
+            }
+
             NSLog(
                 "[Locus] DVT restore finished code=%d duration=%.2fs; clear return does not confirm other apps",
                 code,
@@ -366,14 +385,19 @@ enum LocationEngine {
         return connectAndClear(discoveryTimeout: 3.5)
     }
 
+    /// Stop simulation on the original live DVT channel before disposing it.
+    /// Delay cleanup briefly so the asynchronous device-side transition can
+    /// settle; this is not a guarantee that every client has a real GPS fix.
     private static func clearLocked() -> Int32 {
         guard let locationSimulation else { return locationClear }
-        let err = location_simulation_clear(locationSimulation)
-        cleanup()
-        if let err {
+        if let err = location_simulation_clear(locationSimulation) {
             idevice_error_free(err)
+            cleanup()
             return locationClear
         }
+        NSLog("[Locus] Original DVT clear accepted; holding original session open for 1.0s")
+        Thread.sleep(forTimeInterval: 1.0)
+        cleanup()
         return ok
     }
 }
