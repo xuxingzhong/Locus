@@ -144,3 +144,31 @@
 "The update download URL is invalid." = "The update download URL is invalid.";
 "Update available format" = "Version %@ is available. Locus will stop location simulation and release its developer tunnel before opening SideStore.";
 "LocalDevVPN configuration hint" = "If the default LocalDevVPN configuration cannot connect, set Tunnel IP to 10.7.0.2/30 and Device IP to 10.7.0.1/32. Keep Locus Device Tunnel IP at 10.7.0.1.";
+
+/* Location recovery (v1.0.7) */
+"Real location for recovery" = "Real location for recovery";
+"Not saved" = "Not saved";
+"Automatically captured" = "Automatically captured";
+"Manually selected" = "Manually selected";
+"Expired snapshot — choose a location or recapture" = "Expired snapshot — choose a location or recapture";
+"Usable for nearby restore" = "Usable for nearby restore";
+"Not yet trusted for nearby restore" = "Not yet trusted for nearby restore";
+"Search or edit real location" = "Search or edit real location";
+"Capture current real position" = "Capture current real position";
+"Capturing precise location…" = "Capturing precise location…";
+"Use nearby transition before restoring" = "Use nearby transition before restoring";
+"Auto-capture requires a fresh, precise, non-simulated position before spoofing. Search to edit the place name and coordinate together. A manual location stays until changed; update it after travelling." = "Auto-capture requires a fresh, precise, non-simulated position before spoofing. Search to edit the place name and coordinate together. A manual location stays until changed; update it after travelling.";
+"Precise Location is required to capture a real position." = "Precise Location is required to capture a real position.";
+"Enable location access in iOS Settings or choose an address manually." = "Enable location access in iOS Settings or choose an address manually.";
+"Current position (resolving address…)" = "Current position (resolving address…)";
+"Search for a place or address" = "Search for a place or address";
+"Search and select a real place. Its name is editable, but the coordinate comes from the selected result." = "Search and select a real place. Its name is editable, but the coordinate comes from the selected result.";
+"Matching places" = "Matching places";
+"Unnamed place" = "Unnamed place";
+"Selected recovery location" = "Selected recovery location";
+"Display name" = "Display name";
+"Save recovery location" = "Save recovery location";
+"This manually selected place will be used as a nearby transition before clearing simulation. Update it if you travel." = "This manually selected place will be used as a nearby transition before clearing simulation. Update it if you travel.";
+"Edit real location" = "Edit real location";
+"No matching places found. Try a more complete address." = "No matching places found. Try a more complete address.";
+"Location waypoints, favorites and recents stay in UserDefaults. Address lookup and place search use Apple's location and map services. No Locus analytics or accounts." = "Location waypoints, favorites and recents stay in UserDefaults. Address lookup and place search use Apple's location and map services. No Locus analytics or accounts.";
