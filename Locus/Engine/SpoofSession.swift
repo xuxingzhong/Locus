@@ -101,6 +101,7 @@ final class SpoofSession: ObservableObject {
     private var backgroundTask = UIBackgroundTaskIdentifier.invalid
     private var joystickVector: CGVector = .zero
     private let locationKeeper = BackgroundKeepAlive()
+    private let realLocationStore = RealLocationStore.shared
 
     private let favoritesKey = "locus.favorites"
     private let recentsKey = "locus.recents"
@@ -161,10 +162,19 @@ final class SpoofSession: ObservableObject {
 
         let pairingPath = pairing.pairingPath
         let deviceIP = TunnelConfig.targetIP
+        let nearbyTransitionEnabled =
+            UserDefaults.standard.object(forKey: RealLocationStore.smoothRestoreKey) as? Bool ?? true
+        let settlingNear = nearbyTransitionEnabled && simulated != nil
+            ? realLocationStore.recoveryCoordinate : nil
+        NSLog("[Locus] Restore requested, nearby transition=%@", settlingNear == nil ? "no" : "yes")
 
         Task {
             let result = await Task.detached(priority: .userInitiated) {
-                LocationEngine.clear(pairingPath: pairingPath, deviceIP: deviceIP)
+                LocationEngine.clear(
+                    pairingPath: pairingPath,
+                    deviceIP: deviceIP,
+                    settlingNear: settlingNear
+                )
             }.value
 
             // A later update/stop request can retire this restore while the
@@ -247,6 +257,7 @@ final class SpoofSession: ObservableObject {
     /// Start lightweight GPS updates for the map puck / locate button.
     func startLocationUpdates() {
         locationKeeper.start()
+        realLocationStore.startCaptureIfNeeded()
     }
 
     func startJoystick(pairing: PairingStore) {
@@ -309,8 +320,14 @@ final class SpoofSession: ObservableObject {
                         longitude: previous.longitude + (next.longitude - previous.longitude) * t
                     )
                     let delay = stepMeters / speed
-                    try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    do {
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    } catch {
+                        return
+                    }
+                    guard !Task.isCancelled else { return }
                     await MainActor.run {
+                        guard !Task.isCancelled else { return }
                         self.apply(coord, pairing: pairing, markRecent: false)
                     }
                 }
@@ -390,6 +407,10 @@ final class SpoofSession: ObservableObject {
     }
 
     private func apply(_ coordinate: CLLocationCoordinate2D, pairing: PairingStore, markRecent: Bool) {
+        guard status != .restoring && status != .waitingForRealLocation else { return }
+        // Route playback and joystick can bypass teleport(), so freeze before
+        // every first injection, not only at the teleport button.
+        if simulated == nil { realLocationStore.freezeBeforeSimulation() }
         if status == .idle || status.isDropped {
             status = .connecting
         }
@@ -431,6 +452,7 @@ final class SpoofSession: ObservableObject {
                 postDropNotification(error.localizedDescription)
             } else {
                 status = .idle
+                realLocationStore.resumeAfterFailedSimulationStart()
             }
         }
     }

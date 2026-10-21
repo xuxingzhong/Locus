@@ -9,6 +9,9 @@ struct SettingsView: View {
     @State private var showImporter = false
     @State private var showPairOnDevice = false
     @State private var showNameEasterEgg = false
+    @State private var showRealLocationEditor = false
+    @StateObject private var realLocation = RealLocationStore.shared
+    @AppStorage(RealLocationStore.smoothRestoreKey) private var useNearbyRestore = true
     @State private var tunnelIP = TunnelConfig.targetIP
     @State private var localDevVPNInstalled = LocalDevVPN.isInstalled
     @State private var diagnosticVPNConnected = LocalDevVPN.isConnected
@@ -117,6 +120,66 @@ struct SettingsView: View {
                     Text("LocalDevVPN configuration hint")
                 }
 
+                Section {
+                    LabeledContent("Real location for recovery") {
+                        Text(realLocation.saved?.address ?? String(localized: "Not saved"))
+                            .multilineTextAlignment(.trailing)
+                            .lineLimit(3)
+                    }
+                    if let snapshot = realLocation.saved {
+                        LabeledContent(snapshot.source == .manual
+                                       ? "Manually selected" : "Automatically captured") {
+                            Text(snapshot.capturedAt, style: .relative)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(LocalizedStringKey(realLocation.canUseForRecovery
+                             ? "Usable for nearby restore"
+                             : "Expired snapshot — choose a location or recapture"))
+                            .font(.footnote)
+                            .foregroundStyle(realLocation.canUseForRecovery
+                                             ? LocusTheme.statusGood : LocusTheme.statusWarn)
+                    } else {
+                        Text("Not yet trusted for nearby restore")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Button {
+                        showRealLocationEditor = true
+                    } label: {
+                        Label("Search or edit real location", systemImage: "mappin.and.ellipse")
+                    }
+
+                    Button {
+                        realLocation.requestFreshCapture()
+                    } label: {
+                        if realLocation.isLocating {
+                            HStack {
+                                ProgressView()
+                                Text("Capturing precise location…")
+                            }
+                        } else {
+                            Label("Capture current real position", systemImage: "location.circle")
+                        }
+                    }
+                    .disabled(
+                        realLocation.isLocating || session.isSpoofing
+                        || session.isBusy || LocationEngine.isSessionActive
+                    )
+
+                    if let captureMessage = realLocation.captureMessage {
+                        Text(captureMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Toggle("Use nearby transition before restoring", isOn: $useNearbyRestore)
+                } header: {
+                    Text("Real location for recovery")
+                } footer: {
+                    Text("Auto-capture requires a fresh, precise, non-simulated position before spoofing. Search to edit the place name and coordinate together. A manual location stays until changed; update it after travelling.")
+                }
+
                 Section("Connection Diagnostics") {
                     LabeledContent("RPPairing") {
                         diagnosticValue(pairing.hasPairingFile, ready: "Ready", notReady: "Missing")
@@ -209,7 +272,7 @@ struct SettingsView: View {
                 }
 
                 Section("Privacy") {
-                    Text("Fully on-device. Favorites and recents stay in UserDefaults. No analytics, no accounts, nothing uploaded.")
+                    Text("Location waypoints, favorites and recents stay in UserDefaults. Address lookup and place search use Apple's location and map services. No Locus analytics or accounts.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -271,6 +334,9 @@ struct SettingsView: View {
             )
             .ignoresSafeArea()
         }
+            .sheet(isPresented: $showRealLocationEditor) {
+                RealLocationEditorView()
+            }
             .sheet(isPresented: $showPairOnDevice) {
                 PairOnDeviceView()
                     .environmentObject(pairing)

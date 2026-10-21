@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import Network
 import idevice
@@ -90,7 +91,11 @@ enum LocationEngine {
         return result
     }
 
-    static func clear(pairingPath: String, deviceIP: String) -> Result<Void, LocationEngineError> {
+    static func clear(
+        pairingPath: String,
+        deviceIP: String,
+        settlingNear: CLLocationCoordinate2D? = nil
+    ) -> Result<Void, LocationEngineError> {
         var result: Result<Void, LocationEngineError> = .failure(.locationClear)
         queue.sync {
             // Clear on the same DVT channel that installed the simulation
@@ -105,7 +110,7 @@ enum LocationEngine {
 
             let code: Int32
             if hadLiveSession {
-                let activeCode = clearLocked()
+                let activeCode = clearLocked(settlingNear: settlingNear)
                 if activeCode == ok {
                     NSLog("[Locus] DVT clear succeeded on original location session")
                     code = ok
@@ -388,8 +393,28 @@ enum LocationEngine {
     /// Stop simulation on the original live DVT channel before disposing it.
     /// Delay cleanup briefly so the asynchronous device-side transition can
     /// settle; this is not a guarantee that every client has a real GPS fix.
-    private static func clearLocked() -> Int32 {
+    private static func clearLocked(settlingNear: CLLocationCoordinate2D?) -> Int32 {
         guard let locationSimulation else { return locationClear }
+
+        // Verified manually on iOS 26: reacquiring real GPS after a distant
+        // spoof can improve if we first put the simulated fix near a saved
+        // real-world waypoint. Only try this on the live original DVT session.
+        // Never invent a waypoint or use a simulated CoreLocation callback.
+        if let near = settlingNear, CLLocationCoordinate2DIsValid(near) {
+            let injection = ChinaCoordinateTransform.injectionCoordinate(from: near)
+            if let err = location_simulation_set(
+                locationSimulation,
+                injection.latitude,
+                injection.longitude
+            ) {
+                idevice_error_free(err)
+                NSLog("[Locus] Nearby transition failed; proceeding to DVT clear")
+            } else {
+                NSLog("[Locus] Nearby restore transition accepted; waiting 8s before clear")
+                Thread.sleep(forTimeInterval: 8.0)
+            }
+        }
+
         if let err = location_simulation_clear(locationSimulation) {
             idevice_error_free(err)
             cleanup()
