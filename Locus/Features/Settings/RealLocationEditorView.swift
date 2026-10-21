@@ -63,7 +63,7 @@ struct RealLocationEditorView: View {
                 }
 
                 if selectedPlace != nil {
-                    Section("Selected recovery location") {
+                    Section {
                         TextField("Display name", text: $displayName)
                         Button("Save recovery location") {
                             guard let place = selectedPlace else { return }
@@ -74,6 +74,8 @@ struct RealLocationEditorView: View {
                             dismiss()
                         }
                         .disabled(displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    } header: {
+                        Text("Selected recovery location")
                     } footer: {
                         Text("This manually selected place will be used as a nearby transition before clearing simulation. Update it if you travel.")
                     }
