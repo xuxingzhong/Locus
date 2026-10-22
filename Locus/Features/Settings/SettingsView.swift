@@ -183,7 +183,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Real location for recovery")
                 } footer: {
-                    Text("Recovery first clears simulation and checks fresh fixes. A manual backup is never used automatically; update it after travelling.")
+                    Text("After confirming a fresh real position, recovery always briefly re-applies it and clears simulation once more. The toggle only controls an extra rescue for oscillating locations. Manual backup is never used automatically.")
                 }
 
                 Section("Connection Diagnostics") {
