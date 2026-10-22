@@ -259,6 +259,7 @@ final class SpoofSession: ObservableObject {
                           LocalDevVPN.isConnected,
                           Date().timeIntervalSince(candidate.timestamp) <= 5 else {
                         finishRestore(verified: nil, usedRescue: false)
+                        appendObservationDetails(first)
                         return
                     }
 
@@ -295,6 +296,7 @@ final class SpoofSession: ObservableObject {
                             )
                         } else {
                             finishRestore(verified: nil, usedRescue: true)
+                            appendObservationDetails(second)
                         }
 
                     case .failure(let error):
@@ -307,8 +309,9 @@ final class SpoofSession: ObservableObject {
 
                 case .unconfirmed:
                     // No trustworthy candidate => do NOT re-inject a guessed
-                    // or stale coordinate. Report uncertainty honestly.
+                    // or stale coordinate. Report diagnostics for the next test.
                     finishRestore(verified: nil, usedRescue: false)
+                    appendObservationDetails(first)
                 }
             }
         }
@@ -332,9 +335,8 @@ final class SpoofSession: ObservableObject {
         guard CLLocationCoordinate2DIsValid(fix.coordinate),
               fix.horizontalAccuracy > 0,
               fix.horizontalAccuracy <= 100,
-              let source = fix.sourceInformation,
-              !source.isSimulatedBySoftware,
-              !source.isProducedByAccessory,
+              fix.sourceInformation?.isSimulatedBySoftware != true,
+              fix.sourceInformation?.isProducedByAccessory != true,
               abs(fix.timestamp.timeIntervalSinceNow) <= 5 else {
             finishRestore(verified: nil, usedRescue: usedRescue)
             restoreDetail = String(localized: "The captured real location is no longer fresh. Final reset was skipped.")
@@ -366,6 +368,22 @@ final class SpoofSession: ObservableObject {
             lastError = error.localizedDescription
             restoreDetail = String(localized: "The final real-location reset failed. Third-party apps may still show the previous position.")
         }
+    }
+
+    /// Expose why a restore did not reach the second simulated location.
+    /// Counts contain no coordinates and are safe to show on the settings page.
+    private func appendObservationDetails(_ observation: RecoveryLocationMonitor.Observation) {
+        let counts = String(
+            format: String(localized: "Location observation counts: %d received, %d fresh, %d candidates, %d old or simulated, %d missing source, %d low accuracy, %d stale or duplicate."),
+            observation.rawFixes,
+            observation.totalFixes,
+            observation.freshCandidates,
+            observation.oldSimulatedFixes,
+            observation.missingSourceFixes,
+            observation.poorAccuracyFixes,
+            observation.staleOrDuplicateFixes
+        )
+        restoreDetail = (restoreDetail ?? "") + "\n" + counts
     }
 
     private func describe(_ outcome: RecoveryLocationMonitor.Outcome) -> String {
