@@ -57,6 +57,10 @@ final class RealLocationStore: NSObject, ObservableObject, CLLocationManagerDele
         }
         super.init()
         if manualBackup != nil { persistManual() }
+        // A previous injection may survive an app kill. Do not recapture it
+        // as "real" on the next launch, even if iOS omits the simulation flag.
+        frozen = UserDefaults.standard.object(forKey: "locus.restore.lastInjectionLatitude") != nil
+            && UserDefaults.standard.object(forKey: "locus.restore.lastInjectionLongitude") != nil
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyBest
         manager.distanceFilter = kCLDistanceFilterNone

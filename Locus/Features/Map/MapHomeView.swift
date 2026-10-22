@@ -4,6 +4,7 @@ import SwiftUI
 struct MapHomeView: View {
     @EnvironmentObject private var session: SpoofSession
     @EnvironmentObject private var pairing: PairingStore
+    @Environment(\.scenePhase) private var scenePhase
 
     @StateObject private var search = PlaceSearchCompleter()
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
@@ -118,6 +119,13 @@ struct MapHomeView: View {
         }
         .onAppear {
             session.startLocationUpdates()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active && !session.isSpoofing {
+                // Refresh a new real-world snapshot when opening Locus after
+                // travelling, rather than reusing an idle 30-minute-old fix.
+                session.startLocationUpdates()
+            }
         }
         .onChange(of: session.pin?.latitude) { _, newValue in
             if newValue == nil { pinSelected = false }
