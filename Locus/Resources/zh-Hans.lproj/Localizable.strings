@@ -200,3 +200,24 @@
 "Edit real location" = "修改真实位置";
 "No matching places found. Try a more complete address." = "没有找到匹配的地点，请输入更完整的地址。";
 "Location waypoints, favorites and recents stay in UserDefaults. Address lookup and place search use Apple's location and map services. No Locus analytics or accounts." = "恢复位置、收藏和最近记录仅保存在本机；地址解析和地点搜索使用 Apple 的定位及地图服务。Locus 不收集分析数据，也无需账号。";
+
+/* Smart recovery v1.0.8 */
+"Location Not Confirmed" = "真实定位尚未确认";
+"Clearing the simulated location…" = "正在清除模拟定位…";
+"DVT clear failed; no new location was injected." = "DVT 清除失败，未注入新的定位。";
+"Checking fresh locations for up to 30 seconds…" = "正在观察新的定位数据，最长 30 秒…";
+"Old and new locations alternate; attempting one nearby transition…" = "检测到真假位置交替，正在尝试一次附近位置过渡…";
+"Checking location again after nearby transition…" = "附近过渡完成，正在再次检查真实定位…";
+"Nearby recovery failed; the real position remains unconfirmed." = "附近过渡恢复失败，真实位置仍未确认。";
+"A fresh location was confirmed after one nearby transition. Other apps may refresh later." = "一次附近过渡后获得了较可信的新定位，其他应用可能稍后刷新。";
+"A fresh location was confirmed locally. Other apps may refresh later." = "Locus 已获得较可信的新定位，其他应用可能稍后刷新。";
+"Still unable to verify real location after nearby transition. No further attempts were made." = "附近过渡后仍无法确认真实位置，已停止自动重试。";
+"Unable to verify real location. No second simulation was attempted." = "无法确认真实位置，未尝试第二次模拟。";
+"Location is not verified yet; restore or restart the device first." = "定位尚未确认，请先完成恢复或重启设备。";
+"Latest confirmed real location" = "最近一次确认的真实位置";
+"Manual backup location" = "手动备用恢复位置";
+"Not set" = "未设置";
+"Try one nearby transition when locations oscillate" = "真假位置交替时，尝试一次附近过渡";
+"Recovery first clears simulation and checks fresh fixes. A manual backup is never used automatically; update it after travelling." = "正常恢复会先清除模拟再观察新定位。手动备用位置不会自动使用；移动到其他地区后请更新备用位置。";
+"Restore using manual backup" = "使用手动备用位置恢复";
+"Normal restore never guesses a real coordinate. Manual backup is an explicit fallback and can be stale; Locus cannot reset other apps' own caches." = "正常恢复不会猜测真实坐标。手动备用位置仅在明确点击后使用，可能已过期；Locus 无法清空其他应用自身的定位缓存。";

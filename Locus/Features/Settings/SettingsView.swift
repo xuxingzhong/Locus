@@ -121,8 +121,13 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    LabeledContent("Real location for recovery") {
+                    LabeledContent("Latest confirmed real location") {
                         Text(realLocation.saved?.address ?? String(localized: "Not saved"))
+                            .multilineTextAlignment(.trailing)
+                            .lineLimit(3)
+                    }
+                    LabeledContent("Manual backup location") {
+                        Text(realLocation.manualBackup?.address ?? String(localized: "Not set"))
                             .multilineTextAlignment(.trailing)
                             .lineLimit(3)
                     }
@@ -163,8 +168,9 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(
-                        realLocation.isLocating || session.isSpoofing
-                        || session.isBusy || LocationEngine.isSessionActive
+                        !realLocation.isSafeToCapture || realLocation.isLocating
+                        || session.isSpoofing || session.isBusy
+                        || LocationEngine.isSessionActive
                     )
 
                     if let captureMessage = realLocation.captureMessage {
@@ -173,11 +179,11 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    Toggle("Use nearby transition before restoring", isOn: $useNearbyRestore)
+                    Toggle("Try one nearby transition when locations oscillate", isOn: $useNearbyRestore)
                 } header: {
                     Text("Real location for recovery")
                 } footer: {
-                    Text("Auto-capture requires a fresh, precise, non-simulated position before spoofing. Search to edit the place name and coordinate together. A manual location stays until changed; update it after travelling.")
+                    Text("Recovery first clears simulation and checks fresh fixes. A manual backup is never used automatically; update it after travelling.")
                 }
 
                 Section("Connection Diagnostics") {
@@ -225,6 +231,27 @@ struct SettingsView: View {
                         || session.status == .restoring
                         || session.status == .waitingForRealLocation
                     )
+                    if let manual = realLocation.manualBackup {
+                        Button {
+                            session.stop(pairing: pairing, useManualBackup: true)
+                        } label: {
+                            Label("Restore using manual backup", systemImage: "mappin.and.ellipse")
+                        }
+                        .disabled(
+                            !pairing.hasPairingFile || !diagnosticVPNConnected
+                            || session.isBusy
+                            || session.status == .restoring
+                            || session.status == .waitingForRealLocation
+                        )
+                        Text(manual.address)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let detail = session.restoreDetail {
+                        Text(LocalizedStringKey(detail))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                     if case .restoreFailed(let reason) = session.status {
                         Text(reason)
                             .font(.footnote)
@@ -233,7 +260,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Location Recovery")
                 } footer: {
-                    Text("If an app still shows the simulated position, connect LocalDevVPN and try clearing again. This resends the DVT clear; it cannot reset another app's cached location.")
+                    Text("Normal restore never guesses a real coordinate. Manual backup is an explicit fallback and can be stale; Locus cannot reset other apps' own caches.")
                 }
 
                 Section {
@@ -247,6 +274,7 @@ struct SettingsView: View {
                             } label: {
                                 Label("Update Now", systemImage: "arrow.down.circle.fill")
                             }
+                            .disabled(session.isBusy)
                         } else {
                             Label("Locus is up to date", systemImage: "checkmark.circle.fill")
                                 .foregroundStyle(LocusTheme.statusGood)

@@ -172,3 +172,24 @@
 "Edit real location" = "Edit real location";
 "No matching places found. Try a more complete address." = "No matching places found. Try a more complete address.";
 "Location waypoints, favorites and recents stay in UserDefaults. Address lookup and place search use Apple's location and map services. No Locus analytics or accounts." = "Location waypoints, favorites and recents stay in UserDefaults. Address lookup and place search use Apple's location and map services. No Locus analytics or accounts.";
+
+/* Smart recovery v1.0.8 */
+"Location Not Confirmed" = "Location Not Confirmed";
+"Clearing the simulated location…" = "Clearing the simulated location…";
+"DVT clear failed; no new location was injected." = "DVT clear failed; no new location was injected.";
+"Checking fresh locations for up to 30 seconds…" = "Checking fresh locations for up to 30 seconds…";
+"Old and new locations alternate; attempting one nearby transition…" = "Old and new locations alternate; attempting one nearby transition…";
+"Checking location again after nearby transition…" = "Checking location again after nearby transition…";
+"Nearby recovery failed; the real position remains unconfirmed." = "Nearby recovery failed; the real position remains unconfirmed.";
+"A fresh location was confirmed after one nearby transition. Other apps may refresh later." = "A fresh location was confirmed after one nearby transition. Other apps may refresh later.";
+"A fresh location was confirmed locally. Other apps may refresh later." = "A fresh location was confirmed locally. Other apps may refresh later.";
+"Still unable to verify real location after nearby transition. No further attempts were made." = "Still unable to verify real location after nearby transition. No further attempts were made.";
+"Unable to verify real location. No second simulation was attempted." = "Unable to verify real location. No second simulation was attempted.";
+"Location is not verified yet; restore or restart the device first." = "Location is not verified yet; restore or restart the device first.";
+"Latest confirmed real location" = "Latest confirmed real location";
+"Manual backup location" = "Manual backup location";
+"Not set" = "Not set";
+"Try one nearby transition when locations oscillate" = "Try one nearby transition when locations oscillate";
+"Recovery first clears simulation and checks fresh fixes. A manual backup is never used automatically; update it after travelling." = "Recovery first clears simulation and checks fresh fixes. A manual backup is never used automatically; update it after travelling.";
+"Restore using manual backup" = "Restore using manual backup";
+"Normal restore never guesses a real coordinate. Manual backup is an explicit fallback and can be stale; Locus cannot reset other apps' own caches." = "Normal restore never guesses a real coordinate. Manual backup is an explicit fallback and can be stale; Locus cannot reset other apps' own caches.";

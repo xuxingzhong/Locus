@@ -65,6 +65,8 @@ struct StatusBarView: View {
             return .status("Waiting for Real Location…")
         case .restored:
             return .status("Location Restored")
+        case .restoreUnconfirmed:
+            return .status("Location Not Confirmed")
         case .restoreFailed:
             return .status("Restore Failed")
         case .dropped(let reason):
@@ -81,7 +83,7 @@ struct StatusBarView: View {
         case .status:
             switch session.status {
             case .active: return LocusTheme.statusGood
-            case .connecting, .reconnecting, .restoring, .waitingForRealLocation: return LocusTheme.statusWarn
+            case .connecting, .reconnecting, .restoring, .waitingForRealLocation, .restoreUnconfirmed: return LocusTheme.statusWarn
             case .restored: return LocusTheme.statusGood
             case .restoreFailed, .dropped: return LocusTheme.statusBad
             case .idle: return Color.primary.opacity(0.55)

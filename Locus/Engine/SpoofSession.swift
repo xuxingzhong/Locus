@@ -53,6 +53,7 @@ enum SpoofStatus: Equatable {
     case restoring
     case waitingForRealLocation
     case restored
+    case restoreUnconfirmed
     case restoreFailed(String)
     case dropped(String)
 
@@ -65,6 +66,7 @@ enum SpoofStatus: Equatable {
         case .restoring: return "Restoring…"
         case .waitingForRealLocation: return "Waiting for Real Location…"
         case .restored: return "Location Restored"
+        case .restoreUnconfirmed: return "Location Not Confirmed"
         case .restoreFailed: return "Restore Failed"
         case .dropped: return "Interrupted"
         }
@@ -85,6 +87,7 @@ final class SpoofSession: ObservableObject {
     @Published var mapStyleIndex: Int = 0
     @Published var lastError: String?
     @Published var isBusy = false
+    @Published private(set) var restoreDetail: String?
     @Published var joystickActive = false
     @Published private(set) var isPreparingForUpdate = false
     /// Explicit map-camera request for programmatic selections such as Favorites/Recents.
@@ -102,6 +105,7 @@ final class SpoofSession: ObservableObject {
     private var joystickVector: CGVector = .zero
     private let locationKeeper = BackgroundKeepAlive()
     private let realLocationStore = RealLocationStore.shared
+    private let recoveryMonitor = RecoveryLocationMonitor()
 
     private let favoritesKey = "locus.favorites"
     private let recentsKey = "locus.recents"
@@ -142,12 +146,14 @@ final class SpoofSession: ObservableObject {
         apply(coordinate, pairing: pairing, markRecent: true)
     }
 
-    func stop(pairing: PairingStore) {
+    /// Normal recovery first clears the active DVT channel, THEN evaluates
+    /// fresh CoreLocation fixes. A second nearby transition is only allowed
+    /// for an observed old-fake/likely-real oscillation. Manual backup is
+    /// never used automatically; it is an explicit fallback in Settings.
+    func stop(pairing: PairingStore, useManualBackup: Bool = false) {
         guard !isBusy && status != .restoring && status != .waitingForRealLocation else { return }
 
-        // Retire every already-enqueued resend before clear starts. A Timer
-        // invalidation only prevents future ticks; a MainActor task created by
-        // an earlier tick may still be waiting to run.
+        // Disarm queued writes, route/joystick and all health/resend timers.
         simulationGeneration &+= 1
         let restoreGeneration = simulationGeneration
         routeTask?.cancel()
@@ -156,55 +162,150 @@ final class SpoofSession: ObservableObject {
         stopResend()
         stopHealth()
 
+        let oldSimulated = simulated.map {
+            ChinaCoordinateTransform.injectionCoordinate(from: $0)
+        }
+        let manualBackup = useManualBackup ? realLocationStore.manualBackup?.coordinate : nil
+        let allowSmartRescue =
+            (UserDefaults.standard.object(forKey: RealLocationStore.smoothRestoreKey) as? Bool ?? true)
+            && !useManualBackup
+
         status = .restoring
         isBusy = true
+        restoreDetail = String(localized: "Clearing the simulated location…")
         lastError = nil
 
         let pairingPath = pairing.pairingPath
         let deviceIP = TunnelConfig.targetIP
-        let nearbyTransitionEnabled =
-            UserDefaults.standard.object(forKey: RealLocationStore.smoothRestoreKey) as? Bool ?? true
-        let settlingNear = nearbyTransitionEnabled && simulated != nil
-            ? realLocationStore.recoveryCoordinate : nil
-        NSLog("[Locus] Restore requested, nearby transition=%@", settlingNear == nil ? "no" : "yes")
 
         Task {
-            let result = await Task.detached(priority: .userInitiated) {
-                LocationEngine.clear(
+            // Do not inject the v1.0.7 saved automatic coordinate here: it
+            // might be obsolete because the user has physically moved.
+            let cleared = await Task.detached(priority: .userInitiated) {
+                if let manualBackup {
+                    // Explicit manual fallback must also work when the former
+                    // DVT channel was already lost or the app was relaunched.
+                    return LocationEngine.transitionNearAndClear(
+                        coordinate: manualBackup,
+                        pairingPath: pairingPath,
+                        deviceIP: deviceIP
+                    )
+                }
+                return LocationEngine.clear(
                     pairingPath: pairingPath,
-                    deviceIP: deviceIP,
-                    settlingNear: settlingNear
+                    deviceIP: deviceIP
                 )
             }.value
+            guard restoreGeneration == simulationGeneration else { return }
 
-            // A later update/stop request can retire this restore while the
-            // blocking DVT clear is in flight. Do not overwrite newer state.
-            guard restoreGeneration == simulationGeneration else {
-                NSLog("[Locus] Ignoring stale restore completion")
-                return
-            }
-            isBusy = false
-            switch result {
-            case .success:
-                // The DVT clear was sent without an FFI error. It does not
-                // confirm that all other apps have discarded cached locations.
-                // BackgroundKeepAlive logs a few new CoreLocation observations
-                // for diagnosis, but they cannot prove cross-app restoration.
-                simulated = nil
-                status = .restored
-                endBackground()
-                locationKeeper.refresh()
-
-                Task { @MainActor [weak self] in
-                    try? await Task.sleep(nanoseconds: 1_500_000_000)
-                    guard let self, self.status == .restored else { return }
-                    self.status = .idle
-                }
-
+            switch cleared {
             case .failure(let error):
+                isBusy = false
                 status = .restoreFailed(error.localizedDescription)
                 lastError = error.localizedDescription
+                restoreDetail = String(localized: "DVT clear failed; no new location was injected.")
+                return
+
+            case .success:
+                status = .waitingForRealLocation
+                restoreDetail = String(localized: "Checking fresh locations for up to 30 seconds…")
+                let first = await recoveryMonitor.observe(
+                    previousSimulated: oldSimulated,
+                    timeout: 30
+                )
+                guard restoreGeneration == simulationGeneration else { return }
+                NSLog("[Locus] First post-clear observation: %@", describe(first.outcome))
+
+                switch first.outcome {
+                case .stable(let fix):
+                    finishRestore(verified: fix, usedRescue: false)
+
+                case .oscillating(let candidate):
+                    guard allowSmartRescue,
+                          LocalDevVPN.isConnected,
+                          Date().timeIntervalSince(candidate.timestamp) <= 5 else {
+                        finishRestore(verified: nil, usedRescue: false)
+                        return
+                    }
+
+                    status = .restoring
+                    restoreDetail = String(localized: "Old and new locations alternate; attempting one nearby transition…")
+                    // Do not mark the candidate as trusted yet. It merely
+                    // provides a plausible rescue waypoint, not verified GPS.
+                    let rescued = await Task.detached(priority: .userInitiated) {
+                        LocationEngine.transitionNearAndClear(
+                            coordinate: candidate.coordinate,
+                            pairingPath: pairingPath,
+                            deviceIP: deviceIP
+                        )
+                    }.value
+                    guard restoreGeneration == simulationGeneration else { return }
+
+                    switch rescued {
+                    case .success:
+                        status = .waitingForRealLocation
+                        restoreDetail = String(localized: "Checking location again after nearby transition…")
+                        let second = await recoveryMonitor.observe(
+                            previousSimulated: oldSimulated,
+                            timeout: 20
+                        )
+                        guard restoreGeneration == simulationGeneration else { return }
+                        NSLog("[Locus] Second post-clear observation: %@", describe(second.outcome))
+                        if case .stable(let fix) = second.outcome {
+                            finishRestore(verified: fix, usedRescue: true)
+                        } else {
+                            finishRestore(verified: nil, usedRescue: true)
+                        }
+
+                    case .failure(let error):
+                        NSLog("[Locus] Nearby rescue failed: %@", error.localizedDescription)
+                        // The first DVT clear succeeded. We cannot infer
+                        // restoration failed globally from this second error.
+                        finishRestore(verified: nil, usedRescue: true)
+                        restoreDetail = String(localized: "Nearby recovery failed; the real position remains unconfirmed.")
+                    }
+
+                case .unconfirmed:
+                    // No trustworthy candidate => do NOT re-inject a guessed
+                    // or stale coordinate. Report uncertainty honestly.
+                    finishRestore(verified: nil, usedRescue: false)
+                }
             }
+        }
+    }
+
+    private func describe(_ outcome: RecoveryLocationMonitor.Outcome) -> String {
+        switch outcome {
+        case .stable: return "stable-candidate"
+        case .oscillating: return "old-new-oscillation"
+        case .unconfirmed: return "unconfirmed"
+        }
+    }
+
+    private func finishRestore(verified: CLLocation?, usedRescue: Bool) {
+        isBusy = false
+        simulated = nil
+        endBackground()
+        locationKeeper.refresh()
+
+        if let verified {
+            realLocationStore.acceptConfirmedRecovery(verified)
+            status = .restored
+            restoreDetail = usedRescue
+                ? String(localized: "A fresh location was confirmed after one nearby transition. Other apps may refresh later.")
+                : String(localized: "A fresh location was confirmed locally. Other apps may refresh later.")
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                guard let self, self.status == .restored else { return }
+                self.status = .idle
+            }
+        } else {
+            // Do NOT thaw RealLocationStore: if the OS still uses the spoof
+            // location its subsequent callbacks must not poison auto location.
+            status = .restoreUnconfirmed
+            restoreDetail = usedRescue
+                ? String(localized: "Still unable to verify real location after nearby transition. No further attempts were made.")
+                : String(localized: "Unable to verify real location. No second simulation was attempted.")
         }
     }
 
@@ -214,6 +315,7 @@ final class SpoofSession: ObservableObject {
     /// release every remaining RemotePairing/DVT handle.
     func prepareForUpdate(pairing: PairingStore) async -> Result<Void, LocationEngineError> {
         guard !isPreparingForUpdate else { return .success(()) }
+        guard !isBusy else { return .failure(.notActive) }
         isPreparingForUpdate = true
         simulationGeneration &+= 1
         routeTask?.cancel()

@@ -135,6 +135,49 @@ enum LocationEngine {
         return result
     }
 
+    /// One bounded post-clear rescue: simulate at a newly observed nearby
+    /// candidate on a fresh DVT channel, hold 8 seconds, then clear that SAME
+    /// channel. Do not use stale saved/manual points in this automatic path.
+    /// All FFI operations are serialized, so timer callbacks cannot interleave.
+    static func transitionNearAndClear(
+        coordinate: CLLocationCoordinate2D,
+        pairingPath: String,
+        deviceIP: String
+    ) -> Result<Void, LocationEngineError> {
+        guard CLLocationCoordinate2DIsValid(coordinate) else {
+            return .failure(.locationSet)
+        }
+        let target = ChinaCoordinateTransform.injectionCoordinate(from: coordinate)
+        var result: Result<Void, LocationEngineError> = .failure(.locationSet)
+        queue.sync {
+            NSLog("[Locus] Starting one-time post-clear nearby transition")
+            let setCode = setLocked(
+                latitude: target.latitude, longitude: target.longitude,
+                pairingPath: pairingPath, deviceIP: deviceIP
+            )
+            guard setCode == ok else {
+                result = .failure(.from(code: setCode))
+                return
+            }
+            Thread.sleep(forTimeInterval: 8.0)
+            let clearCode = clearLocked(settlingNear: nil)
+            if clearCode == ok {
+                result = .success(())
+            } else {
+                // The original channel was released on failure. Try one
+                // standalone clear so we do not leave our rescue simulation up.
+                let fallback = clearWithFreshSessionLocked(
+                    pairingPath: pairingPath, deviceIP: deviceIP
+                )
+                result = fallback == ok
+                    ? .success(())
+                    : .failure(.from(code: fallback))
+            }
+            NSLog("[Locus] One-time transition/clear finished")
+        }
+        return result
+    }
+
     private static func cleanup() {
         if let locationSimulation {
             location_simulation_free(locationSimulation)

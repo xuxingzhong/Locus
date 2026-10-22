@@ -87,7 +87,10 @@ struct RealLocationEditorView: View {
                     Button("Cancel") { dismiss() }
                 }
             }
-            .onAppear { query = realLocation.saved?.address ?? "" }
+            .onAppear {
+                query = realLocation.manualBackup?.address
+                    ?? realLocation.saved?.address ?? ""
+            }
         }
     }
 
