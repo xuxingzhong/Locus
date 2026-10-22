@@ -193,3 +193,11 @@
 "Recovery first clears simulation and checks fresh fixes. A manual backup is never used automatically; update it after travelling." = "Recovery first clears simulation and checks fresh fixes. A manual backup is never used automatically; update it after travelling.";
 "Restore using manual backup" = "Restore using manual backup";
 "Normal restore never guesses a real coordinate. Manual backup is an explicit fallback and can be stale; Locus cannot reset other apps' own caches." = "Normal restore never guesses a real coordinate. Manual backup is an explicit fallback and can be stale; Locus cannot reset other apps' own caches.";
+
+/* Verified real-fix final reset */
+"Fresh real location captured. Reapplying it and clearing simulation again…" = "Fresh real location captured. Reapplying it and clearing simulation again…";
+"The captured real location is no longer fresh. Final reset was skipped." = "The captured real location is no longer fresh. Final reset was skipped.";
+"The final real-location reset failed. Third-party apps may still show the previous position." = "The final real-location reset failed. Third-party apps may still show the previous position.";
+"Real location confirmed after rescue; the final set-and-clear completed. Other apps may still cache old positions." = "Real location confirmed after rescue; the final set-and-clear completed. Other apps may still cache old positions.";
+"Real location confirmed; the final set-and-clear completed. Other apps may still cache old positions." = "Real location confirmed; the final set-and-clear completed. Other apps may still cache old positions.";
+"After confirming a fresh real position, recovery always briefly re-applies it and clears simulation once more. The toggle only controls an extra rescue for oscillating locations. Manual backup is never used automatically." = "After confirming a fresh real position, recovery always briefly re-applies it and clears simulation once more. The toggle only controls an extra rescue for oscillating locations. Manual backup is never used automatically.";
