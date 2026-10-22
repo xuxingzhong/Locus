@@ -116,7 +116,7 @@ final class RecoveryLocationMonitor: NSObject, CLLocationManagerDelegate {
             return true
         }
 
-        let windowHasOld = recent.contains(\.oldSimulation)
+        let windowHasOld = recent.contains(where: { $0.oldSimulation })
         if valid.count >= 5,
            let first = valid.first,
            latest.timestamp.timeIntervalSince(first.timestamp) >= 10,
