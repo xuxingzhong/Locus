@@ -221,3 +221,11 @@
 "Recovery first clears simulation and checks fresh fixes. A manual backup is never used automatically; update it after travelling." = "正常恢复会先清除模拟再观察新定位。手动备用位置不会自动使用；移动到其他地区后请更新备用位置。";
 "Restore using manual backup" = "使用手动备用位置恢复";
 "Normal restore never guesses a real coordinate. Manual backup is an explicit fallback and can be stale; Locus cannot reset other apps' own caches." = "正常恢复不会猜测真实坐标。手动备用位置仅在明确点击后使用，可能已过期；Locus 无法清空其他应用自身的定位缓存。";
+
+/* Verified real-fix final reset */
+"Fresh real location captured. Reapplying it and clearing simulation again…" = "已采集到较可信的真实位置，正在重新定位到该位置并再次清除模拟…";
+"The captured real location is no longer fresh. Final reset was skipped." = "采集到的真实位置已不够新，已跳过最后一次重置。";
+"The final real-location reset failed. Third-party apps may still show the previous position." = "最后一次真实位置重置失败，其他应用仍可能显示之前的位置。";
+"Real location confirmed after rescue; the final set-and-clear completed. Other apps may still cache old positions." = "附近过渡后已确认较可信的真实位置，并完成最后一次设置与清除；其他应用仍可能缓存旧位置。";
+"Real location confirmed; the final set-and-clear completed. Other apps may still cache old positions." = "已确认较可信的真实位置，并完成最后一次设置与清除；其他应用仍可能缓存旧位置。";
+"After confirming a fresh real position, recovery always briefly re-applies it and clears simulation once more. The toggle only controls an extra rescue for oscillating locations. Manual backup is never used automatically." = "确认新的真实位置后，会无条件短暂设置到该位置并再次清除模拟；开关只控制真假位置交替时的额外恢复。手动备用位置不会自动使用。";
