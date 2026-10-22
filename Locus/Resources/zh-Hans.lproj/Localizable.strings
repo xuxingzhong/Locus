@@ -229,3 +229,6 @@
 "Real location confirmed after rescue; the final set-and-clear completed. Other apps may still cache old positions." = "附近过渡后已确认较可信的真实位置，并完成最后一次设置与清除；其他应用仍可能缓存旧位置。";
 "Real location confirmed; the final set-and-clear completed. Other apps may still cache old positions." = "已确认较可信的真实位置，并完成最后一次设置与清除；其他应用仍可能缓存旧位置。";
 "After confirming a fresh real position, recovery always briefly re-applies it and clears simulation once more. The toggle only controls an extra rescue for oscillating locations. Manual backup is never used automatically." = "确认新的真实位置后，会无条件短暂设置到该位置并再次清除模拟；开关只控制真假位置交替时的额外恢复。手动备用位置不会自动使用。";
+
+/* Post-clear CoreLocation diagnostics */
+"Location observation counts: %d received, %d fresh, %d candidates, %d old or simulated, %d missing source, %d low accuracy, %d stale or duplicate." = "定位采样：收到 %d 条、新鲜 %d 条、有效候选 %d 条、旧位置或模拟 %d 条、缺少来源信息 %d 条、低精度 %d 条、过期或重复 %d 条。";
