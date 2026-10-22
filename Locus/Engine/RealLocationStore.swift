@@ -139,9 +139,8 @@ final class RealLocationStore: NSObject, ObservableObject, CLLocationManagerDele
         guard CLLocationCoordinate2DIsValid(fix.coordinate),
               fix.horizontalAccuracy > 0,
               fix.horizontalAccuracy <= 100,
-              let source = fix.sourceInformation,
-              !source.isSimulatedBySoftware,
-              !source.isProducedByAccessory else { return }
+              fix.sourceInformation?.isSimulatedBySoftware != true,
+              fix.sourceInformation?.isProducedByAccessory != true else { return }
         let point = SavedPoint(
             latitude: fix.coordinate.latitude,
             longitude: fix.coordinate.longitude,
