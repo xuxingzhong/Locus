@@ -174,9 +174,10 @@ final class SpoofSession: ObservableObject {
     }
 
     /// Normal recovery first clears the active DVT channel, THEN evaluates
-    /// fresh CoreLocation fixes. A second nearby transition is only allowed
-    /// for an observed old-fake/likely-real oscillation. Manual backup is
-    /// never used automatically; it is an explicit fallback in Settings.
+    /// fresh CoreLocation fixes. After a real fix is confirmed, ALWAYS
+    /// briefly inject that current position and clear it again, including
+    /// when no oscillation was observed. The optional oscillation rescue is
+    /// separate. Manual backup is only used when explicitly requested.
     func stop(pairing: PairingStore, useManualBackup: Bool = false) {
         guard !isBusy && status != .restoring && status != .waitingForRealLocation else { return }
 
@@ -245,7 +246,13 @@ final class SpoofSession: ObservableObject {
 
                 switch first.outcome {
                 case .stable(let fix):
-                    finishRestore(verified: fix, usedRescue: false)
+                    await resetAtConfirmedRealLocation(
+                        fix,
+                        pairingPath: pairingPath,
+                        deviceIP: deviceIP,
+                        restoreGeneration: restoreGeneration,
+                        usedRescue: false
+                    )
 
                 case .oscillating(let candidate):
                     guard allowSmartRescue,
@@ -279,7 +286,13 @@ final class SpoofSession: ObservableObject {
                         guard restoreGeneration == simulationGeneration else { return }
                         NSLog("[Locus] Second post-clear observation: %@", describe(second.outcome))
                         if case .stable(let fix) = second.outcome {
-                            finishRestore(verified: fix, usedRescue: true)
+                            await resetAtConfirmedRealLocation(
+                                fix,
+                                pairingPath: pairingPath,
+                                deviceIP: deviceIP,
+                                restoreGeneration: restoreGeneration,
+                                usedRescue: true
+                            )
                         } else {
                             finishRestore(verified: nil, usedRescue: true)
                         }
@@ -298,6 +311,60 @@ final class SpoofSession: ObservableObject {
                     finishRestore(verified: nil, usedRescue: false)
                 }
             }
+        }
+    }
+
+    /// Once the fresh real-world fix has passed the existing stability checks,
+    /// always force a final set-to-real -> hold -> clear sequence. This may
+    /// refresh locationd for clients still showing an older injected fix, but
+    /// cannot invalidate third-party apps' own location caches.
+    private func resetAtConfirmedRealLocation(
+        _ fix: CLLocation,
+        pairingPath: String,
+        deviceIP: String,
+        restoreGeneration: UInt64,
+        usedRescue: Bool
+    ) async {
+        guard restoreGeneration == simulationGeneration else { return }
+
+        // Fail closed: never use a stale/mocked fix (nor an old saved/manual
+        // waypoint) to perform the automatic final reset.
+        guard CLLocationCoordinate2DIsValid(fix.coordinate),
+              fix.horizontalAccuracy > 0,
+              fix.horizontalAccuracy <= 100,
+              let source = fix.sourceInformation,
+              !source.isSimulatedBySoftware,
+              !source.isProducedByAccessory,
+              abs(fix.timestamp.timeIntervalSinceNow) <= 5 else {
+            finishRestore(verified: nil, usedRescue: usedRescue)
+            restoreDetail = String(localized: "The captured real location is no longer fresh. Final reset was skipped.")
+            return
+        }
+
+        status = .restoring
+        restoreDetail = String(localized: "Fresh real location captured. Reapplying it and clearing simulation again…")
+        NSLog("[Locus] Verified a fresh real fix; performing mandatory final set-and-clear")
+
+        // The engine serializes all DVT operations. Keep the session open for
+        // its bounded hold, then clear on the SAME session before reporting
+        // completion. Run off the main actor so the UI remains responsive.
+        let result = await Task.detached(priority: .userInitiated) {
+            LocationEngine.transitionNearAndClear(
+                coordinate: fix.coordinate,
+                pairingPath: pairingPath,
+                deviceIP: deviceIP
+            )
+        }.value
+        guard restoreGeneration == simulationGeneration else { return }
+
+        switch result {
+        case .success:
+            finishRestore(verified: fix, usedRescue: usedRescue)
+        case .failure(let error):
+            NSLog("[Locus] Mandatory final set-and-clear failed: %@", error.localizedDescription)
+            finishRestore(verified: nil, usedRescue: usedRescue)
+            lastError = error.localizedDescription
+            restoreDetail = String(localized: "The final real-location reset failed. Third-party apps may still show the previous position.")
         }
     }
 
@@ -320,8 +387,8 @@ final class SpoofSession: ObservableObject {
             clearRememberedInjection()
             status = .restored
             restoreDetail = usedRescue
-                ? String(localized: "A fresh location was confirmed after one nearby transition. Other apps may refresh later.")
-                : String(localized: "A fresh location was confirmed locally. Other apps may refresh later.")
+                ? String(localized: "Real location confirmed after rescue; the final set-and-clear completed. Other apps may still cache old positions.")
+                : String(localized: "Real location confirmed; the final set-and-clear completed. Other apps may still cache old positions.")
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
                 guard let self, self.status == .restored else { return }
