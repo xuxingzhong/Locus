@@ -109,6 +109,33 @@ final class SpoofSession: ObservableObject {
 
     private let favoritesKey = "locus.favorites"
     private let recentsKey = "locus.recents"
+    private let lastInjectionLatitudeKey = "locus.restore.lastInjectionLatitude"
+    private let lastInjectionLongitudeKey = "locus.restore.lastInjectionLongitude"
+
+    /// Remember the last injection even if Locus is killed before clearing.
+    /// After relaunch, old fake fixes must not be accepted as new real GPS.
+    private var lastInjectedCoordinate: CLLocationCoordinate2D? {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: lastInjectionLatitudeKey) != nil,
+              defaults.object(forKey: lastInjectionLongitudeKey) != nil else { return nil }
+        let coordinate = CLLocationCoordinate2D(
+            latitude: defaults.double(forKey: lastInjectionLatitudeKey),
+            longitude: defaults.double(forKey: lastInjectionLongitudeKey)
+        )
+        return CLLocationCoordinate2DIsValid(coordinate) ? coordinate : nil
+    }
+
+    private func rememberInjection(_ coordinate: CLLocationCoordinate2D) {
+        let defaults = UserDefaults.standard
+        defaults.set(coordinate.latitude, forKey: lastInjectionLatitudeKey)
+        defaults.set(coordinate.longitude, forKey: lastInjectionLongitudeKey)
+    }
+
+    private func clearRememberedInjection() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: lastInjectionLatitudeKey)
+        defaults.removeObject(forKey: lastInjectionLongitudeKey)
+    }
 
     init() {
         favorites = SavedPlace.load(key: favoritesKey)
@@ -164,7 +191,7 @@ final class SpoofSession: ObservableObject {
 
         let oldSimulated = simulated.map {
             ChinaCoordinateTransform.injectionCoordinate(from: $0)
-        }
+        } ?? lastInjectedCoordinate
         let manualBackup = useManualBackup ? realLocationStore.manualBackup?.coordinate : nil
         let allowSmartRescue =
             (UserDefaults.standard.object(forKey: RealLocationStore.smoothRestoreKey) as? Bool ?? true)
@@ -290,6 +317,7 @@ final class SpoofSession: ObservableObject {
 
         if let verified {
             realLocationStore.acceptConfirmedRecovery(verified)
+            clearRememberedInjection()
             status = .restored
             restoreDetail = usedRescue
                 ? String(localized: "A fresh location was confirmed after one nearby transition. Other apps may refresh later.")
@@ -538,6 +566,8 @@ final class SpoofSession: ObservableObject {
         case .success:
             simulated = coordinate
             pin = coordinate
+            rememberInjection(injectionCoordinate)
+            restoreDetail = nil
             status = .active
             lastError = nil
             beginBackground()
