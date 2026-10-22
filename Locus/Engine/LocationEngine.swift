@@ -136,7 +136,7 @@ enum LocationEngine {
     }
 
     /// One bounded post-clear rescue: simulate at a newly observed nearby
-    /// candidate on a fresh DVT channel, hold 8 seconds, then clear that SAME
+    /// candidate on a fresh DVT channel, hold 10 seconds, then clear that SAME
     /// channel. Do not use stale saved/manual points in this automatic path.
     /// All FFI operations are serialized, so timer callbacks cannot interleave.
     static func transitionNearAndClear(
@@ -159,7 +159,7 @@ enum LocationEngine {
                 result = .failure(.from(code: setCode))
                 return
             }
-            Thread.sleep(forTimeInterval: 8.0)
+            Thread.sleep(forTimeInterval: 10.0)
             let clearCode = clearLocked(settlingNear: nil)
             if clearCode == ok {
                 result = .success(())
@@ -453,8 +453,8 @@ enum LocationEngine {
                 idevice_error_free(err)
                 NSLog("[Locus] Nearby transition failed; proceeding to DVT clear")
             } else {
-                NSLog("[Locus] Nearby restore transition accepted; waiting 8s before clear")
-                Thread.sleep(forTimeInterval: 8.0)
+                NSLog("[Locus] Nearby restore transition accepted; waiting 10s before clear")
+                Thread.sleep(forTimeInterval: 10.0)
             }
         }
 
