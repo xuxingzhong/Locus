@@ -201,3 +201,6 @@
 "Real location confirmed after rescue; the final set-and-clear completed. Other apps may still cache old positions." = "Real location confirmed after rescue; the final set-and-clear completed. Other apps may still cache old positions.";
 "Real location confirmed; the final set-and-clear completed. Other apps may still cache old positions." = "Real location confirmed; the final set-and-clear completed. Other apps may still cache old positions.";
 "After confirming a fresh real position, recovery always briefly re-applies it and clears simulation once more. The toggle only controls an extra rescue for oscillating locations. Manual backup is never used automatically." = "After confirming a fresh real position, recovery always briefly re-applies it and clears simulation once more. The toggle only controls an extra rescue for oscillating locations. Manual backup is never used automatically.";
+
+/* Post-clear CoreLocation diagnostics */
+"Location observation counts: %d received, %d fresh, %d candidates, %d old or simulated, %d missing source, %d low accuracy, %d stale or duplicate." = "Location observation counts: %d received, %d fresh, %d candidates, %d old or simulated, %d missing source, %d low accuracy, %d stale or duplicate.";
